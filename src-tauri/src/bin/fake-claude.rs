@@ -5,6 +5,9 @@
 //!   RESPOSTA: {"ok": true}       (structured_output do sucesso)
 //!   UTILIZACAO: 0.5              (janela de 5 h no rate_limit_event)
 //! Grava os argumentos recebidos em `fake-args.json` no diretório de trabalho.
+//!
+//! Sem `RESPOSTA:`, procura a resposta do papel em `$FAKE_CLAUDE_RESPOSTAS/<title do schema>.json`
+//! (ou `<title>.<variante>.json`, quando o prompt contém `FAKE_VARIANTE=<variante>`).
 
 use std::io::{Read, Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -63,6 +66,7 @@ fn main() {
         "sucesso" => {
             let resposta: Value = campo("RESPOSTA:")
                 .and_then(|r| serde_json::from_str(&r).ok())
+                .or_else(|| resposta_do_papel(par("--json-schema")?, &prompt))
                 .unwrap_or(json!({"ok": true}));
             emitir(resultado(false, None, Some(resposta), "ok"));
         }
@@ -87,6 +91,21 @@ fn main() {
             std::process::exit(4);
         }
     }
+}
+
+fn resposta_do_papel(schema: &str, prompt: &str) -> Option<Value> {
+    let dir = std::env::var_os("FAKE_CLAUDE_RESPOSTAS")?;
+    let schema: Value = serde_json::from_str(schema).ok()?;
+    let titulo = schema.get("title")?.as_str()?;
+    let variante = prompt.split("FAKE_VARIANTE=").nth(1).map(|r| {
+        r.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect::<String>()
+    });
+    let nome = match variante {
+        Some(v) => format!("{titulo}.{v}.json"),
+        None => format!("{titulo}.json"),
+    };
+    let texto = std::fs::read_to_string(std::path::Path::new(&dir).join(nome)).ok()?;
+    serde_json::from_str(&texto).ok()
 }
 
 fn resultado(is_error: bool, http: Option<u16>, saida: Option<Value>, texto: &str) -> Value {

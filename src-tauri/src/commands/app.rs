@@ -47,7 +47,8 @@ pub async fn settings_salvar(
     let limpa = |s: Option<String>| s.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty());
     let settings = Settings {
         claude_path: limpa(settings.claude_path),
-        model: limpa(settings.model),
+        modelo_rapido: limpa(Some(settings.modelo_rapido)).unwrap_or_else(|| Settings::default().modelo_rapido),
+        modelo_forte: limpa(Some(settings.modelo_forte)).unwrap_or_else(|| Settings::default().modelo_forte),
         timeout_secs: settings.timeout_secs,
     };
     let caminho_mudou = {

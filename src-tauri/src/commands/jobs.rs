@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::domain::{EstadoFila, Job, UsoClaude};
+use crate::domain::{EstadoFila, Job, PerfilModelo, UsoClaude};
 use crate::error::AppResult;
 use crate::llm::jobs::NovoJob;
 use crate::state::{AmbienteApp, AppState};
@@ -54,6 +54,7 @@ pub async fn claude_testar_execucao(
             "required": ["ok"],
             "additionalProperties": false
         }),
+        perfil: PerfilModelo::Rapido,
     };
     state.fila.enfileirar(&AmbienteApp(app), novo, confirmado)
 }

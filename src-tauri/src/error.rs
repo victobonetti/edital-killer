@@ -50,6 +50,18 @@ pub enum ErrorCode {
     ClaudeProcessoFalhou,
     /// Job não existe ou não está num estado que permita a operação.
     JobNotFound,
+    /// O usuário cancelou o job.
+    JobCancelado,
+    /// O app fechou com o job em execução.
+    JobInterrompido,
+    /// Mais de 20% das páginas com problema: processar exige confirmação.
+    EditalConfirmarPaginas,
+    /// A triagem diz que o PDF não é um edital de abertura (motivo no `detail`).
+    EditalNaoEEdital,
+    /// A triagem não achou seção para o bloco.
+    ExtracaoSemSecoes,
+    /// A verificação literal reprovou mais de 30% dos itens do bloco.
+    ExtracaoIncompleta,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, thiserror::Error)]

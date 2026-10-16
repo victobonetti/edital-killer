@@ -3,6 +3,7 @@
 pub mod config_repo;
 pub mod db;
 pub mod edital_repo;
+pub mod extracao_repo;
 pub mod job_repo;
 pub mod paths;
 

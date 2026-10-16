@@ -16,6 +16,8 @@ pub const EVENTO_JOBS: &str = "jobs-atualizados";
 pub const EVENTO_USO: &str = "claude-uso";
 /// Payload: `Job` em estado final.
 pub const EVENTO_JOB_TERMINOU: &str = "job-terminou";
+/// O processamento de um edital mudou. Payload: id do edital.
+pub const EVENTO_EXTRACAO: &str = "extracao-atualizada";
 /// Janela pediu para fechar com job em execução. Payload: `EstadoFila`.
 pub const EVENTO_FECHAR_PEDIDO: &str = "fechar-pedido";
 
@@ -99,7 +101,19 @@ impl Ambiente for AmbienteApp {
                 self.0.emit(EVENTO_JOBS, estado)
             }
             Notificacao::Uso(uso) => self.0.emit(EVENTO_USO, uso),
-            Notificacao::JobTerminou(job) => self.0.emit(EVENTO_JOB_TERMINOU, job),
+            Notificacao::JobTerminou(job) => {
+                // Fora da fila: gravar o resultado da extração não pode travar o laço.
+                let app = self.0.clone();
+                let terminado = job.clone();
+                tauri::async_runtime::spawn(async move {
+                    let state = app.state::<AppState>();
+                    if let Err(e) = crate::extracao::ao_terminar(&AmbienteApp(app.clone()), &state.fila, &terminado) {
+                        tracing::error!(job = %terminado.id, erro = %e, "falha ao gravar resultado da extração");
+                    }
+                });
+                self.0.emit(EVENTO_JOB_TERMINOU, job)
+            }
+            Notificacao::Extracao(edital_id) => self.0.emit(EVENTO_EXTRACAO, edital_id),
             Notificacao::LoginPerdido => {
                 let app = self.0.clone();
                 tauri::async_runtime::spawn(async move {

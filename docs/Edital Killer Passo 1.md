@@ -279,7 +279,7 @@ Dividir e conquistar: o core fatia o edital localmente, uma triagem barata diz o
 | # | Etapa | Claude? | Entrada | Saída |
 | --- | --- | --- | --- | --- |
 | 1 | Mapa | Não | Texto das páginas | Seções: título, faixa de páginas, tamanho |
-| 2 | Triagem | Sim, modelo rápido | Sumário: título + primeiros ~300 caracteres de cada seção | É edital? Categoria de cada seção. Lista de cargos |
+| 2 | Triagem | Sim, modelo rápido | Sumário: título + primeiros ~400 caracteres de cada seção | É edital? Categorias de cada seção |
 | 3 | Extração por bloco | Sim | Só as seções da categoria do bloco | Dados estruturados, cada um com página e trecho |
 | 4 | Verificação literal | Não | Trechos citados | Cada item `verificado` ou `nao_verificado`, com offsets para destaque |
 | 5 | Curadoria | Não | Revisão do usuário | Itens `revisado`; edital `curado` |
@@ -288,18 +288,22 @@ Dividir e conquistar: o core fatia o edital localmente, uma triagem barata diz o
 
 - Títulos de seção por regex sobre o texto de cada página: `N. DA/DO/DAS/DOS …` em caixa alta e `ANEXO <romano> – …`. Validado no TCE-SP 2026: 15 seções e 6 anexos, todos nas páginas certas.
 - Cabeçalhos e rodapés repetidos (linha idêntica em mais da metade das páginas, como "TRIBUNAL DE CONTAS DO ESTADO DE SÃO PAULO") são ignorados no mapa e no texto enviado ao Claude. O texto salvo não muda.
+- Seções numeradas só valem em sequência (1, 2, 3…) e antes dos anexos: listas numeradas dentro de anexos e citações de itens no meio do texto não viram seção. Texto antes do primeiro título vira "Preâmbulo" (é onde costumam estar órgão, número do edital e banca).
+- Se o que a seção pega da página final é só cabeçalho, a faixa recua para a página anterior.
 - Sem títulos reconhecíveis: o mapa cai para blocos de 5 páginas, e a triagem classifica blocos em vez de seções.
 
 **Etapa 2 — Triagem** (papel `triagem`, modelo rápido)
 
 - Entrada: o sumário do mapa. Alguns milhares de tokens, independente do tamanho do edital.
-- Saída: `e_edital` (com motivo, para recusar provas, gabaritos e retificações soltas), a categoria de cada seção e a lista de cargos (nome, código, área, página).
+- Saída: `e_edital` (com motivo, para recusar provas, gabaritos e retificações soltas) e as categorias de cada seção (uma seção pode ter várias; "DO CONCURSO" costuma ser dados gerais e provas). Seção que a triagem pular vira `outros`.
+- A lista de cargos **não** vem da triagem: ela só vê 400 caracteres de cada seção e perderia cargos em tabelas. Vem do bloco `cargos`, que lê as seções de cargos inteiras.
+- Medido em 2026-10-16 no TCE-SP 2026 (haiku): 22 seções, classificação correta, ~7 mil tokens de entrada, ~1,4 mil de saída, 11 s.
 - Categorias: `dados_gerais`, `inscricao`, `cargos_vagas`, `requisitos_atribuicoes`, `cronograma`, `provas_avaliacao`, `conteudo_programatico`, `outros`. `outros` (formulários, recursos, disposições finais) não é extraído.
 - `e_edital = false` encerra o processamento com `EDITAL_NAO_E_EDITAL`.
 
 **Etapa 3 — Blocos**
 
-Depois da triagem, o usuário vê a lista de cargos e marca os de interesse. Os blocos gerais rodam sempre; os blocos por cargo rodam só para os marcados (e para outros, sob demanda).
+Os blocos gerais (`dados_gerais`, `cargos`, `cronograma`) entram na fila assim que a triagem termina. Quando `cargos` termina, o usuário vê a lista de cargos e marca os de interesse; os blocos por cargo rodam só para os marcados (e para outros, sob demanda).
 
 | Bloco (papel) | Escopo | Modelo | Seções | Dados |
 | --- | --- | --- | --- | --- |
@@ -334,7 +338,9 @@ Depois da triagem, o usuário vê a lista de cargos e marca os de interesse. Os 
 - O usuário edita qualquer campo (o item fica `editado`), confirma blocos (`revisado`) e marca o edital como `curado`.
 - Reextrair um bloco é sempre manual. Se o bloco tem itens editados, a UI avisa que as edições serão perdidas antes de seguir. Prompt de versão nova não reextrai nada sozinho; a UI só indica que há versão mais nova.
 
-**Persistência (migração 004)**
+**Persistência (migrações 004 em diante, uma por etapa implementada)**
+
+A 004 cria `secao`, `extracao` e o resultado da triagem em `edital` (`e_edital`, `triagem_motivo`). As tabelas dos blocos chegam com eles.
 
 | Tabela | Conteúdo |
 | --- | --- |
@@ -351,8 +357,8 @@ Dados gerais ganham colunas em `edital` (número, data de publicação, taxa, pe
 
 **Fluxo na tela do Edital**
 
-1. "Processar edital": mapa e triagem. Se mais de 20% das páginas tiverem problema, pede confirmação antes. O aviso de uso alto do Item 3 também vale.
-2. Aparecem a lista de cargos (com caixas de seleção) e, assim que os blocos terminam, os dados gerais e o cronograma.
+1. "Processar edital": mapa e triagem. Se mais de 20% das páginas tiverem problema, pede confirmação antes (`EDITAL_CONFIRMAR_PAGINAS`). O aviso de uso alto do Item 3 também vale. As seções aparecem na hora; as categorias, quando a triagem termina.
+2. Os blocos gerais rodam; aparecem a lista de cargos (com caixas de seleção), os dados gerais e o cronograma.
 3. "Extrair cargos selecionados": enfileira `provas` e `conteudo` de cada cargo marcado.
 4. "Revisar": abre a tela de Revisão.
 
@@ -360,6 +366,8 @@ Dados gerais ganham colunas em `edital` (número, data de publicação, taxa, pe
 
 | Código | Quando |
 | --- | --- |
+| `EDITAL_CONFIRMAR_PAGINAS` | Mais de 20% das páginas com problema e o usuário ainda não confirmou |
+| `JOB_CANCELADO`, `JOB_INTERROMPIDO` | O job do bloco foi cancelado, ou o app fechou com ele rodando (a extração pendente é marcada na abertura seguinte) |
 | `EDITAL_NAO_E_EDITAL` | A triagem diz que o PDF não é um edital (o motivo vai no `detail`) |
 | `EXTRACAO_SEM_SECOES` | A triagem não achou seção para o bloco (ex.: edital sem conteúdo programático) |
 | `EXTRACAO_INCOMPLETA` | O resultado veio, mas a verificação literal reprovou mais de 30% dos itens; o bloco fica disponível para revisão e o usuário decide se reextrai |

@@ -13,11 +13,13 @@ use tokio::sync::{watch, Notify};
 use super::claude_cli::runner::{self, Execucao, Falha};
 use super::claude_cli::stream::{self, Desfecho};
 use super::claude_cli::discovery;
-use crate::domain::{EstadoFila, Job, JobStatus, NivelUso, UsoClaude};
+use crate::domain::{EstadoFila, Job, JobStatus, NivelUso, PerfilModelo, UsoClaude};
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::storage::{config_repo, job_repo, AppPaths, Db};
 
 pub const RESULTADO: &str = "resultado.json";
+/// Modelo pedido, resolvido das Configurações na hora de enfileirar.
+pub const MODELO: &str = "modelo.txt";
 
 pub trait Ambiente: Send + Sync + 'static {
     fn db(&self) -> &Db;
@@ -34,6 +36,8 @@ pub enum Notificacao {
     JobTerminou(Job),
     /// O `claude` perdeu o login no meio de um job.
     LoginPerdido,
+    /// O estado da extração de um edital mudou (id do edital).
+    Extracao(String),
 }
 
 /// O que um papel (localizador, extrator…) entrega para virar job.
@@ -43,6 +47,7 @@ pub struct NovoJob {
     pub system: String,
     pub prompt: String,
     pub schema: Value,
+    pub perfil: PerfilModelo,
 }
 
 /// Esperas da fila. Os testes encurtam.
@@ -169,6 +174,8 @@ impl Fila {
         std::fs::write(ws.join(runner::SYSTEM), &novo.system)?;
         std::fs::write(ws.join(runner::PROMPT), &novo.prompt)?;
         std::fs::write(ws.join(runner::SCHEMA), serde_json::to_string(&novo.schema)?)?;
+        let modelo = config_repo::settings(&conn)?.modelo(novo.perfil).to_owned();
+        std::fs::write(ws.join(MODELO), &modelo)?;
         job_repo::inserir(&conn, &id, novo.edital_id.as_deref(), &novo.tipo, &agora())?;
         let job = job_repo::get(&conn, &id)?;
         drop(conn);
@@ -320,10 +327,14 @@ impl Fila {
             Ok(s) => s,
             Err(e) => return Fim::Falhou(e),
         };
+        let modelo = std::fs::read_to_string(ws.join(MODELO))
+            .ok()
+            .map(|m| m.trim().to_owned())
+            .filter(|m| !m.is_empty());
         let ex = Execucao {
             claude: &claude,
             workspace: &ws,
-            modelo: settings.model.as_deref(),
+            modelo: modelo.as_deref(),
             timeout: Duration::from_secs(settings.timeout_secs.into()),
         };
         let mut consumo = job.consumo.clone().unwrap_or_default();

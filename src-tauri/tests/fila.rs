@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use edital_killer_lib::domain::{
-    JanelaUso, Job, JobStatus, NivelUso, Settings, UsoClaude,
+    JanelaUso, Job, JobStatus, NivelUso, PerfilModelo, Settings, UsoClaude,
 };
 use edital_killer_lib::error::ErrorCode;
 use edital_killer_lib::llm::jobs::{Ambiente, Esperas, Fila, NovoJob, Notificacao};
@@ -35,7 +35,8 @@ fn ambiente(timeout_secs: u32) -> Arc<Teste> {
     let db = Db::open(&paths.db_file()).unwrap();
     let settings = Settings {
         claude_path: Some(env!("CARGO_BIN_EXE_fake-claude").to_owned()),
-        model: Some("fake".into()),
+        modelo_rapido: "fake".into(),
+        modelo_forte: "fake-forte".into(),
         timeout_secs,
     };
     config_repo::save_settings(&db.conn().unwrap(), &settings).unwrap();
@@ -73,6 +74,7 @@ fn novo(cenario: &str) -> NovoJob {
             "properties": {"ok": {"type": "boolean"}},
             "required": ["ok"]
         }),
+        perfil: PerfilModelo::Rapido,
     }
 }
 
@@ -316,7 +318,8 @@ async fn claude_real_com_haiku() {
     let amb = ambiente(120);
     let settings = Settings {
         claude_path: None,
-        model: Some("haiku".into()),
+        modelo_rapido: "haiku".into(),
+        modelo_forte: "sonnet".into(),
         timeout_secs: 120,
     };
     config_repo::save_settings(&amb.db.conn().unwrap(), &settings).unwrap();

@@ -11,6 +11,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/001_inicial.sql"),
     include_str!("migrations/002_execucao_jobs.sql"),
     include_str!("migrations/003_qualidade_paginas.sql"),
+    include_str!("migrations/004_mapa_extracao.sql"),
 ];
 
 /// Passos em Rust que rodam na mesma transação, logo depois da migração de versão `v`.

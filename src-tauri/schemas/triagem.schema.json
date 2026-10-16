@@ -1,0 +1,37 @@
+{
+  "title": "triagem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["e_edital", "motivo", "secoes"],
+  "properties": {
+    "e_edital": { "type": "boolean" },
+    "motivo": { "type": "string" },
+    "secoes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "categorias"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^S[0-9]+$" },
+          "categorias": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "dados_gerais",
+                "inscricao",
+                "cargos_vagas",
+                "requisitos_atribuicoes",
+                "cronograma",
+                "provas_avaliacao",
+                "conteudo_programatico",
+                "outros"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

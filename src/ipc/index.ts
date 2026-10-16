@@ -5,6 +5,7 @@ import type { AppError } from "../bindings/AppError";
 import type { BackendStatus } from "../bindings/BackendStatus";
 import type { Bootstrap } from "../bindings/Bootstrap";
 import type { Edital } from "../bindings/Edital";
+import type { EstadoExtracao } from "../bindings/EstadoExtracao";
 import type { EstadoFila } from "../bindings/EstadoFila";
 import type { EditalUpdate } from "../bindings/EditalUpdate";
 import type { ErrorCode } from "../bindings/ErrorCode";
@@ -61,6 +62,11 @@ export const ipc = {
   importarAbortar: (id: string, code: Extract<ErrorCode, "IMPORT_ENCRYPTED" | "IMPORT_CORRUPTED" | "IMPORT_CANCELADO">) =>
     call<void>("importar_abortar", { id, code }),
 
+  /** Mapa + triagem. Pode falhar com `EDITAL_CONFIRMAR_PAGINAS` ou `CLAUDE_USO_ALTO`, para a UI confirmar. */
+  editalProcessar: (id: string, confirmarPaginas: boolean, confirmarUso: boolean) =>
+    call<EstadoExtracao>("edital_processar", { id, confirmarPaginas, confirmarUso }),
+  extracaoEstado: (id: string) => call<EstadoExtracao>("extracao_estado", { id }),
+
   jobsListar: () => call<Job[]>("jobs_listar"),
   filaEstado: () => call<EstadoFila>("fila_estado"),
   jobCancelar: (id: string) => call<void>("job_cancelar", { id }),
@@ -90,4 +96,9 @@ export function onJobTerminou(cb: (j: Job) => void): Promise<UnlistenFn> {
 /** A janela pediu para fechar com job em execução. */
 export function onFecharPedido(cb: (e: EstadoFila) => void): Promise<UnlistenFn> {
   return listen<EstadoFila>("fechar-pedido", (ev) => cb(ev.payload));
+}
+
+/** O processamento de um edital mudou. Payload: id do edital. */
+export function onExtracaoAtualizada(cb: (editalId: string) => void): Promise<UnlistenFn> {
+  return listen<string>("extracao-atualizada", (ev) => cb(ev.payload));
 }

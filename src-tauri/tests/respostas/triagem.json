@@ -1,0 +1,12 @@
+{
+  "e_edital": true,
+  "motivo": "Edital de abertura de concurso público do Tribunal de Contas.",
+  "secoes": [
+    { "id": "S0", "categorias": ["dados_gerais"] },
+    { "id": "S1", "categorias": ["dados_gerais"] },
+    { "id": "S2", "categorias": ["dados_gerais", "provas_avaliacao"] },
+    { "id": "S3", "categorias": ["cargos_vagas"] },
+    { "id": "S4", "categorias": ["inscricao"] },
+    { "id": "S5", "categorias": ["conteudo_programatico"] }
+  ]
+}

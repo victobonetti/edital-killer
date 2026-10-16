@@ -896,6 +896,7 @@ dependencies = [
  "hex",
  "jsonschema",
  "libc",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

@@ -173,3 +173,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .teste-execucao { margin-top: 8px; }
 .andamento-topo { display: flex; justify-content: space-between; gap: 8px; }
 .aviso-coluna { flex-direction: column; gap: 4px; }
+
+.motivo { font-size: 12.5px; margin: 4px 0 8px; }
+.status-bloco { font-size: 12.5px; margin: 6px 0; }
+.status-bloco.pendente { color: var(--accent); }
+.status-bloco.concluido { color: var(--ok); }
+.secoes { list-style: none; padding: 0; margin: 0; font-size: 12.5px; }
+.secoes li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.secao-titulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.secao-categorias { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.tag.categoria { font-size: 11px; padding: 1px 6px; }
+.tag.categoria.outros { color: var(--muted); }
+.tag.categoria.conteudo_programatico, .tag.categoria.provas_avaliacao { color: var(--accent); }

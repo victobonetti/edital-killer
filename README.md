@@ -17,6 +17,7 @@ npm run tauri dev      # app em modo desenvolvimento
 npm test               # testes da UI (Vitest)
 cd src-tauri && cargo test   # testes do core e da fila (contra o fake-claude); regenera src/bindings (ts-rs)
 cd src-tauri && cargo test --test fila claude_real -- --ignored   # fila contra o claude real (haiku, gasta pouca cota)
+EK_DB=<cópia do banco> cargo test --test extracao triagem_real -- --ignored --nocapture   # triagem real num edital importado
 ```
 
 ## Estado
@@ -26,4 +27,4 @@ cd src-tauri && cargo test --test fila claude_real -- --ignored   # fila contra 
 | 1. App desktop | Telas Biblioteca, Edital, Setup e Configurações; barra de status com Claude, uso do plano e fila; painel de jobs com Cancelar, tempo decorrido e consumo; confirmação ao fechar com job rodando; SQLite com migrações; logs rotacionados. Falta: tela de Revisão |
 | 2. Upload do edital | Completo: dialog e arrastar-soltar, validação `%PDF`, SHA-256, duplicatas, extração por página com pdf.js, qualidade do texto por página (`ok`, `sem_texto`, `suspeito`), OCR local com tesseract.js nas páginas ruins, cancelamento, normalização com mapa de índices, remoção |
 | 3. Claude CLI | Feito: descoberta, health check, runner (`stream-json`, prompt por stdin, isolado de hooks/MCP/CLAUDE.md), fila serial persistida, catálogo de erros com novas tentativas, cancelamento da árvore de processos (Job Object no Windows), consumo por job, limite de uso com pausa e retomada, aviso de uso alto, teste de execução no Diagnóstico |
-| 4. Extração | Não iniciado |
+| 4. Extração | Feito: mapa de seções (local), triagem com o Claude (é edital? categorias das seções), painel de processamento no Edital, modelo rápido e forte nas Configurações. Falta: blocos (dados gerais, cargos, cronograma, provas, conteúdo), verificação literal, Revisão |

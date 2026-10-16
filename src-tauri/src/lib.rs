@@ -2,6 +2,7 @@ mod commands;
 // Públicos para os testes de integração (tests/), que usam o fake-claude.
 pub mod domain;
 pub mod error;
+pub mod extracao;
 mod importacao;
 pub mod llm;
 mod state;
@@ -54,6 +55,10 @@ pub fn run() {
             if orfaos > 0 {
                 tracing::warn!(orfaos, "jobs interrompidos pelo fechamento anterior");
             }
+            let soltas = storage::extracao_repo::reconciliar(&*db.conn()?, &chrono::Utc::now().to_rfc3339())?;
+            if soltas > 0 {
+                tracing::warn!(soltas, "extrações marcadas como interrompidas");
+            }
             let fila = Fila::nova(&db, Esperas::default());
             app.manage(AppState::new(db, paths, Arc::clone(&fila)));
             tauri::async_runtime::spawn(fila.rodar(Arc::new(AmbienteApp(app.handle().clone()))));
@@ -105,6 +110,8 @@ pub fn run() {
             commands::jobs::claude_uso,
             commands::jobs::claude_testar_execucao,
             commands::jobs::app_sair,
+            commands::extracao::edital_processar,
+            commands::extracao::extracao_estado,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

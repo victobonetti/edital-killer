@@ -107,4 +107,33 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
     titulo: "Job não encontrado",
     explicacao: "Este job não existe mais ou já terminou.",
   },
+  JOB_CANCELADO: {
+    titulo: "Cancelado",
+    explicacao: "O job foi cancelado antes de terminar.",
+    acao: "Processe de novo quando quiser.",
+  },
+  JOB_INTERROMPIDO: {
+    titulo: "Interrompido",
+    explicacao: "O app foi fechado enquanto o job rodava.",
+    acao: "Processe de novo.",
+  },
+  EDITAL_CONFIRMAR_PAGINAS: {
+    titulo: "Muitas páginas com problema",
+    explicacao: "Mais de 20% das páginas deste edital estão sem texto ou ilegíveis, mesmo depois do OCR.",
+    acao: "Confirme para processar mesmo assim.",
+  },
+  EDITAL_NAO_E_EDITAL: {
+    titulo: "Não parece um edital de abertura",
+    explicacao: "A triagem concluiu que este PDF não é um edital de abertura de concurso (o motivo está nos detalhes).",
+    acao: "Confira se importou o arquivo certo. Se for mesmo um edital, processe de novo.",
+  },
+  EXTRACAO_SEM_SECOES: {
+    titulo: "Nada para extrair",
+    explicacao: "A triagem não encontrou nenhuma seção deste tipo no edital.",
+  },
+  EXTRACAO_INCOMPLETA: {
+    titulo: "Extração com itens não conferidos",
+    explicacao: "Parte dos itens extraídos não foi encontrada literalmente no texto do edital.",
+    acao: "Revise os itens marcados ou extraia este bloco de novo.",
+  },
 };

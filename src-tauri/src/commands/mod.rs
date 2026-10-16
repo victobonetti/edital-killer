@@ -3,4 +3,5 @@
 pub mod app;
 pub mod claude;
 pub mod editais;
+pub mod extracao;
 pub mod jobs;

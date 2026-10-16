@@ -4,8 +4,8 @@ import type { Edital } from "../bindings/Edital";
 import { ErrorBox } from "../components/ErrorBox";
 import { faixas } from "../components/faixas";
 import { PdfViewer } from "../components/pdf/PdfViewer";
+import { Processamento } from "../components/Processamento";
 import { ipc, toAppError } from "../ipc";
-import { CATALOGO } from "../ipc/errors";
 
 /** Avisos de qualidade das páginas, já depois do OCR. */
 function AvisoPaginas({ edital }: { edital: Edital }) {
@@ -96,17 +96,7 @@ export function EditalScreen({
           <PdfViewer editalId={edital.id} />
         </section>
         <aside className="edital-lateral">
-          <h2>Cargos</h2>
-          <p className="mudo">
-            {semTexto
-              ? CATALOGO.EDITAL_SEM_TEXTO.explicacao
-              : "A localização de cargos com o Claude chega na próxima etapa da implementação."}
-          </p>
-          <div className="acoes">
-            <button className="primario" disabled title="Disponível com a integração do Claude">
-              Localizar cargos
-            </button>
-          </div>
+          <Processamento edital={edital} />
           <hr />
           <dl className="meta">
             <dt>Arquivo</dt>

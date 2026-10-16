@@ -55,11 +55,19 @@ export function Configuracoes({ pastaDados, onVoltar }: { pastaDados: string; on
           />
         </label>
         <label>
-          Modelo
+          Modelo rápido (triagem, dados gerais, cargos, cronograma)
           <input
-            value={s.model ?? ""}
-            placeholder="Padrão do Claude Code"
-            onChange={(e) => setS({ ...s, model: e.target.value || null })}
+            value={s.modelo_rapido}
+            placeholder="haiku"
+            onChange={(e) => setS({ ...s, modelo_rapido: e.target.value })}
+          />
+        </label>
+        <label>
+          Modelo forte (provas, conteúdo programático)
+          <input
+            value={s.modelo_forte}
+            placeholder="sonnet"
+            onChange={(e) => setS({ ...s, modelo_forte: e.target.value })}
           />
         </label>
         <label>

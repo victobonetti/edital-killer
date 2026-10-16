@@ -6,9 +6,13 @@ export type Settings = {
  */
 claude_path: string | null, 
 /**
- * Modelo passado ao `claude --model`. `None` = padrão do CLI.
+ * Modelo dos papéis simples (triagem, dados gerais, cargos, cronograma).
  */
-model: string | null, 
+modelo_rapido: string, 
+/**
+ * Modelo dos papéis pesados (provas, conteúdo programático).
+ */
+modelo_forte: string, 
 /**
  * Tempo limite de cada job, em segundos.
  */
