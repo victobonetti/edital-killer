@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@fontsource-variable/public-sans": "^5.3.0",
     "@tauri-apps/api": "^2",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.1.0",

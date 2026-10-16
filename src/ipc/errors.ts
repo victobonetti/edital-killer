@@ -80,8 +80,8 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
   },
   CLAUDE_LIMITE_USO: {
     titulo: "Limite de uso do Claude atingido",
-    explicacao: "Seu plano do Claude chegou ao limite da janela de uso. O job voltou para a fila.",
-    acao: "A fila retoma sozinha quando o limite renovar. Não é preciso fazer nada.",
+    explicacao: "Seu plano do Claude chegou ao limite de uso. A análise ficou guardada.",
+    acao: "Ela continua sozinha quando o limite renovar. Não é preciso fazer nada.",
   },
   CLAUDE_USO_ALTO: {
     titulo: "Uso do Claude está alto",
@@ -91,7 +91,7 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
   CLAUDE_SAIDA_INVALIDA: {
     titulo: "Resposta do Claude fora do formato",
     explicacao: "O Claude respondeu, mas não no formato que o app exige, mesmo depois de uma nova tentativa.",
-    acao: "Tente de novo. Se repetir, abra os logs em Configurações; o workspace do job guarda a resposta.",
+    acao: "Tente de novo. Se repetir, abra os registros técnicos em Ajustes.",
   },
   CLAUDE_ERRO_API: {
     titulo: "Serviço do Claude com problema",
@@ -105,16 +105,16 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
   },
   JOB_NOT_FOUND: {
     titulo: "Job não encontrado",
-    explicacao: "Este job não existe mais ou já terminou.",
+    explicacao: "Esta análise não existe mais ou já terminou.",
   },
   JOB_CANCELADO: {
     titulo: "Cancelado",
-    explicacao: "O job foi cancelado antes de terminar.",
+    explicacao: "A análise foi interrompida antes de terminar.",
     acao: "Processe de novo quando quiser.",
   },
   JOB_INTERROMPIDO: {
     titulo: "Interrompido",
-    explicacao: "O app foi fechado enquanto o job rodava.",
+    explicacao: "O app foi fechado durante a análise.",
     acao: "Processe de novo.",
   },
   EDITAL_CONFIRMAR_PAGINAS: {

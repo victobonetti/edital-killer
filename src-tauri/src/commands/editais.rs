@@ -89,14 +89,25 @@ pub async fn importar_paginas(
 
 #[tauri::command]
 pub async fn importar_finalizar(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     total_paginas: u32,
 ) -> AppResult<Edital> {
-    let conn = state.db.conn()?;
-    exigir_importando(&edital_repo::get(&conn, &id)?)?;
-    let e = edital_repo::finalizar_importacao(&conn, &id, total_paginas)?;
+    let e = {
+        let conn = state.db.conn()?;
+        exigir_importando(&edital_repo::get(&conn, &id)?)?;
+        edital_repo::finalizar_importacao(&conn, &id, total_paginas)?
+    };
     tracing::info!(edital = %id, total_paginas, problemas = e.paginas_problema.len(), ocr = e.paginas_ocr.len(), status = ?e.status, "importação concluída");
+    // A análise (mapa + triagem) começa sozinha. Edital com muitas páginas ruins espera
+    // o usuário confirmar na tela do edital. A triagem é pequena (~7 mil tokens), então
+    // não passa pelo aviso de uso alto.
+    if e.status == EditalStatus::Importado && !e.exige_confirmacao {
+        if let Err(err) = crate::extracao::processar(&AmbienteApp(app), &state.fila, &id, false, true) {
+            tracing::warn!(edital = %id, code = ?err.code, detail = %err.detail, "análise automática não começou");
+        }
+    }
     Ok(e)
 }
 
