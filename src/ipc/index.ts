@@ -5,12 +5,14 @@ import type { AppError } from "../bindings/AppError";
 import type { BackendStatus } from "../bindings/BackendStatus";
 import type { Bootstrap } from "../bindings/Bootstrap";
 import type { Edital } from "../bindings/Edital";
+import type { EstadoFila } from "../bindings/EstadoFila";
 import type { EditalUpdate } from "../bindings/EditalUpdate";
 import type { ErrorCode } from "../bindings/ErrorCode";
 import type { ImportStart } from "../bindings/ImportStart";
 import type { Job } from "../bindings/Job";
 import type { PaginaInput } from "../bindings/PaginaInput";
 import type { Settings } from "../bindings/Settings";
+import type { UsoClaude } from "../bindings/UsoClaude";
 
 export function isAppError(e: unknown): e is AppError {
   return typeof e === "object" && e !== null && "code" in e && "detail" in e;
@@ -51,16 +53,41 @@ export const ipc = {
 
   importarIniciar: (caminho: string) => call<ImportStart>("importar_iniciar", { caminho }),
   importarRetomar: (id: string) => call<Edital>("importar_retomar", { id }),
+  /** Devolve as páginas do lote que precisam de OCR. */
   importarPaginas: (id: string, paginas: PaginaInput[]) =>
-    call<void>("importar_paginas", { id, paginas }),
+    call<number[]>("importar_paginas", { id, paginas }),
   importarFinalizar: (id: string, totalPaginas: number) =>
     call<Edital>("importar_finalizar", { id, totalPaginas }),
-  importarAbortar: (id: string, code: Extract<ErrorCode, "IMPORT_ENCRYPTED" | "IMPORT_CORRUPTED">) =>
+  importarAbortar: (id: string, code: Extract<ErrorCode, "IMPORT_ENCRYPTED" | "IMPORT_CORRUPTED" | "IMPORT_CANCELADO">) =>
     call<void>("importar_abortar", { id, code }),
 
   jobsListar: () => call<Job[]>("jobs_listar"),
+  filaEstado: () => call<EstadoFila>("fila_estado"),
+  jobCancelar: (id: string) => call<void>("job_cancelar", { id }),
+  filaRetomar: () => call<void>("fila_retomar"),
+  claudeUso: () => call<UsoClaude | null>("claude_uso"),
+  /** Com uso alto e `confirmado = false`, falha com `CLAUDE_USO_ALTO`. */
+  claudeTestarExecucao: (confirmado: boolean) => call<Job>("claude_testar_execucao", { confirmado }),
+  appSair: () => call<void>("app_sair"),
 };
 
 export function onClaudeStatus(cb: (s: BackendStatus) => void): Promise<UnlistenFn> {
   return listen<BackendStatus>("claude-status", (ev) => cb(ev.payload));
+}
+
+export function onJobsAtualizados(cb: (e: EstadoFila) => void): Promise<UnlistenFn> {
+  return listen<EstadoFila>("jobs-atualizados", (ev) => cb(ev.payload));
+}
+
+export function onClaudeUso(cb: (u: UsoClaude) => void): Promise<UnlistenFn> {
+  return listen<UsoClaude>("claude-uso", (ev) => cb(ev.payload));
+}
+
+export function onJobTerminou(cb: (j: Job) => void): Promise<UnlistenFn> {
+  return listen<Job>("job-terminou", (ev) => cb(ev.payload));
+}
+
+/** A janela pediu para fechar com job em execução. */
+export function onFecharPedido(cb: (e: EstadoFila) => void): Promise<UnlistenFn> {
+  return listen<EstadoFila>("fechar-pedido", (ev) => cb(ev.payload));
 }

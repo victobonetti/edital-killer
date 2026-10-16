@@ -7,7 +7,20 @@ use crate::error::{AppError, AppResult, ErrorCode};
 
 /// Migrações versionadas, aplicadas em ordem. A versão atual fica em `PRAGMA user_version`.
 /// Nunca edite uma migração já publicada: acrescente outra.
-const MIGRATIONS: &[&str] = &[include_str!("migrations/001_inicial.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/001_inicial.sql"),
+    include_str!("migrations/002_execucao_jobs.sql"),
+    include_str!("migrations/003_qualidade_paginas.sql"),
+];
+
+/// Passos em Rust que rodam na mesma transação, logo depois da migração de versão `v`.
+fn pos_migracao(tx: &rusqlite::Transaction, v: usize) -> AppResult<()> {
+    if v == 3 {
+        let n = super::edital_repo::reclassificar_paginas(tx)?;
+        tracing::info!(paginas = n, "páginas reclassificadas por qualidade");
+    }
+    Ok(())
+}
 
 pub struct Db {
     conn: Mutex<Connection>,
@@ -53,6 +66,7 @@ fn migrate(conn: &mut Connection) -> AppResult<()> {
     for (i, sql) in MIGRATIONS.iter().enumerate().skip(atual) {
         let tx = conn.transaction()?;
         tx.execute_batch(sql)?;
+        pos_migracao(&tx, i + 1)?;
         tx.pragma_update(None, "user_version", i + 1)?;
         tx.commit()?;
         tracing::info!(versao = i + 1, "migração aplicada");

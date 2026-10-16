@@ -56,7 +56,8 @@ impl BackendStatus {
 
 /// Backend de LLM usado pelo core. No Passo 1 a única implementação é
 /// `ClaudeCliBackend`; o adaptador BYOK (API key) entra depois por esta interface.
-/// A execução de jobs entra aqui junto com o runner (Item 3).
+/// A fila (`llm::jobs`) ainda chama o runner do `claude_cli` direto; a execução
+/// entra nesta interface junto com o segundo backend.
 #[async_trait]
 pub trait LlmBackend: Send + Sync {
     async fn health_check(&self) -> BackendStatus;

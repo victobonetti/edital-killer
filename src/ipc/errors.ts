@@ -39,6 +39,15 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
     explicacao: "O arquivo parece ser um PDF, mas não pôde ser aberto. A cópia foi descartada.",
     acao: "Baixe o edital de novo da página oficial e tente outra vez.",
   },
+  IMPORT_OCR_FAILED: {
+    titulo: "OCR falhou em algumas páginas",
+    explicacao: "A leitura por OCR não funcionou nessas páginas; elas ficaram como estavam no PDF.",
+    acao: "Se o conteúdo programático estiver nelas, procure uma versão do edital com texto selecionável.",
+  },
+  IMPORT_CANCELADO: {
+    titulo: "Importação cancelada",
+    explicacao: "A importação foi interrompida e nada foi salvo.",
+  },
   EDITAL_NOT_FOUND: {
     titulo: "Edital não encontrado",
     explicacao: "Este edital não existe mais na biblioteca.",
@@ -46,8 +55,8 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
   EDITAL_SEM_TEXTO: {
     titulo: "Edital sem texto",
     explicacao:
-      "Nenhuma página deste PDF tem texto extraível; ele provavelmente é uma digitalização. Leitura por OCR ainda não é suportada.",
-    acao: "Procure uma versão do edital com texto selecionável.",
+      "Nenhuma página deste PDF tem texto legível, nem depois da leitura por OCR. O processamento fica bloqueado.",
+    acao: "Procure uma versão do edital com texto selecionável ou uma digitalização de melhor qualidade.",
   },
   CLAUDE_NOT_FOUND: {
     titulo: "Claude Code não encontrado",
@@ -66,7 +75,36 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
   },
   CLAUDE_TIMEOUT: {
     titulo: "Claude Code não respondeu",
-    explicacao: "O Claude Code demorou demais para responder.",
-    acao: "Verifique sua conexão e tente de novo.",
+    explicacao: "O Claude Code demorou demais para responder e foi encerrado.",
+    acao: "Verifique sua conexão. Para editais grandes, aumente o tempo limite em Configurações.",
+  },
+  CLAUDE_LIMITE_USO: {
+    titulo: "Limite de uso do Claude atingido",
+    explicacao: "Seu plano do Claude chegou ao limite da janela de uso. O job voltou para a fila.",
+    acao: "A fila retoma sozinha quando o limite renovar. Não é preciso fazer nada.",
+  },
+  CLAUDE_USO_ALTO: {
+    titulo: "Uso do Claude está alto",
+    explicacao: "Sua janela de uso passou de 80%. Um job grande pode esgotá-la no meio.",
+    acao: "Confirme para iniciar mesmo assim, ou espere a janela renovar.",
+  },
+  CLAUDE_SAIDA_INVALIDA: {
+    titulo: "Resposta do Claude fora do formato",
+    explicacao: "O Claude respondeu, mas não no formato que o app exige, mesmo depois de uma nova tentativa.",
+    acao: "Tente de novo. Se repetir, abra os logs em Configurações; o workspace do job guarda a resposta.",
+  },
+  CLAUDE_ERRO_API: {
+    titulo: "Serviço do Claude com problema",
+    explicacao: "O serviço do Claude devolveu erro (por exemplo, sobrecarga) em três tentativas seguidas.",
+    acao: "Espere alguns minutos e tente de novo.",
+  },
+  CLAUDE_PROCESSO_FALHOU: {
+    titulo: "Claude Code parou no meio",
+    explicacao: "O processo do Claude Code terminou sem entregar resposta.",
+    acao: "Rode `claude` num terminal para ver se ele abre normalmente. Os detalhes técnicos trazem a saída de erro.",
+  },
+  JOB_NOT_FOUND: {
+    titulo: "Job não encontrado",
+    explicacao: "Este job não existe mais ou já terminou.",
   },
 };

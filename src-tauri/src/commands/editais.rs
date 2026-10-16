@@ -7,7 +7,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::domain::{Edital, EditalStatus, EditalUpdate, ImportStart, PaginaInput};
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::importacao;
-use crate::state::AppState;
+use crate::state::{AmbienteApp, AppState};
 use crate::storage::edital_repo;
 
 /// Abre o dialog nativo (filtro `.pdf`, seleção múltipla). Lista vazia = cancelado.
@@ -50,7 +50,9 @@ pub async fn edital_atualizar(
 }
 
 #[tauri::command]
-pub async fn edital_remover(state: State<'_, AppState>, id: String) -> AppResult<()> {
+pub async fn edital_remover(app: AppHandle, state: State<'_, AppState>, id: String) -> AppResult<()> {
+    // Nenhum claude pode continuar trabalhando num edital que vai sumir.
+    state.fila.cancelar_do_edital(&AmbienteApp(app), &id).await?;
     importacao::remover_edital(&state.db, &state.paths, &id)
 }
 
@@ -78,7 +80,8 @@ pub async fn importar_paginas(
     state: State<'_, AppState>,
     id: String,
     paginas: Vec<PaginaInput>,
-) -> AppResult<()> {
+) -> AppResult<Vec<u32>> {
+    // Devolve as páginas do lote que precisam de OCR.
     let mut conn = state.db.conn()?;
     exigir_importando(&edital_repo::get(&conn, &id)?)?;
     edital_repo::salvar_paginas(&mut conn, &id, &paginas)
@@ -93,7 +96,7 @@ pub async fn importar_finalizar(
     let conn = state.db.conn()?;
     exigir_importando(&edital_repo::get(&conn, &id)?)?;
     let e = edital_repo::finalizar_importacao(&conn, &id, total_paginas)?;
-    tracing::info!(edital = %id, total_paginas, sem_texto = e.paginas_sem_texto.len(), status = ?e.status, "importação concluída");
+    tracing::info!(edital = %id, total_paginas, problemas = e.paginas_problema.len(), ocr = e.paginas_ocr.len(), status = ?e.status, "importação concluída");
     Ok(e)
 }
 

@@ -2,3 +2,4 @@
 
 pub mod backend;
 pub mod claude_cli;
+pub mod jobs;

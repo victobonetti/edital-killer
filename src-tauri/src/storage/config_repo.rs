@@ -1,6 +1,6 @@
 use rusqlite::{Connection, OptionalExtension};
 
-use crate::domain::Settings;
+use crate::domain::{Settings, UsoClaude};
 use crate::error::AppResult;
 
 const SETTINGS: &str = "settings";
@@ -41,4 +41,30 @@ pub fn health_ja_passou(conn: &Connection) -> AppResult<bool> {
 
 pub fn marcar_health_passou(conn: &Connection) -> AppResult<()> {
     set(conn, HEALTH_JA_PASSOU, "1")
+}
+
+const USO_CLAUDE: &str = "claude_uso";
+const FILA_PAUSADA_ATE: &str = "fila_pausada_ate";
+
+pub fn uso_claude(conn: &Connection) -> AppResult<Option<UsoClaude>> {
+    Ok(get(conn, USO_CLAUDE)?.and_then(|j| serde_json::from_str(&j).ok()))
+}
+
+pub fn salvar_uso_claude(conn: &Connection, uso: &UsoClaude) -> AppResult<()> {
+    set(conn, USO_CLAUDE, &serde_json::to_string(uso)?)
+}
+
+/// ISO 8601 até quando a fila fica pausada por limite de uso.
+pub fn fila_pausada_ate(conn: &Connection) -> AppResult<Option<String>> {
+    get(conn, FILA_PAUSADA_ATE)
+}
+
+pub fn salvar_fila_pausada_ate(conn: &Connection, ate: Option<&str>) -> AppResult<()> {
+    match ate {
+        Some(ate) => set(conn, FILA_PAUSADA_ATE, ate),
+        None => {
+            conn.execute("DELETE FROM config WHERE chave = ?1", [FILA_PAUSADA_ATE])?;
+            Ok(())
+        }
+    }
 }

@@ -22,9 +22,13 @@ pub enum ErrorCode {
     ImportEncrypted,
     /// pdf.js não conseguiu abrir o PDF.
     ImportCorrupted,
+    /// O OCR de uma página falhou (worker, dado de idioma). A página fica como estava.
+    ImportOcrFailed,
+    /// O usuário cancelou a importação (ex.: durante o OCR).
+    ImportCancelado,
     /// Edital não encontrado.
     EditalNotFound,
-    /// Edital sem texto extraível: processamento bloqueado até existir OCR.
+    /// Edital sem texto legível, nem depois do OCR: processamento bloqueado.
     EditalSemTexto,
     /// Executável `claude` não encontrado.
     ClaudeNotFound,
@@ -34,6 +38,18 @@ pub enum ErrorCode {
     ClaudeNotLoggedIn,
     /// `claude` não respondeu dentro do tempo limite.
     ClaudeTimeout,
+    /// Limite de uso do plano atingido; o job volta para a fila.
+    ClaudeLimiteUso,
+    /// Utilização da janela acima de 80%: enfileirar exige confirmação.
+    ClaudeUsoAlto,
+    /// Resposta sem `structured_output` ou fora do schema.
+    ClaudeSaidaInvalida,
+    /// Erro da API (5xx, sobrecarga) informado no `result`.
+    ClaudeErroApi,
+    /// Processo saiu sem evento `result`.
+    ClaudeProcessoFalhou,
+    /// Job não existe ou não está num estado que permita a operação.
+    JobNotFound,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, thiserror::Error)]

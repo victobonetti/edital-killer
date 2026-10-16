@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { AppError } from "../bindings/AppError";
 import type { Edital } from "../bindings/Edital";
 import type { EditalStatus } from "../bindings/EditalStatus";
 import { ErrorBox } from "../components/ErrorBox";
-import { importarArquivo, retomarImportacao, type Progresso } from "../import/importar";
+import { importarArquivo, retomarImportacao, type Progresso, type ResultadoImport } from "../import/importar";
+import { faixas } from "../components/faixas";
 import { ipc, toAppError } from "../ipc";
 
 const STATUS: Record<EditalStatus, string> = {
   importando: "Importação incompleta",
   importado: "Importado",
-  sem_texto: "Sem texto (OCR não suportado)",
+  sem_texto: "Sem texto legível",
 };
 
 type EmAndamento = { arquivo: string; progresso: Progresso | null };
@@ -18,6 +19,21 @@ type Falha = { arquivo: string; erro: AppError };
 
 function nomeArquivo(caminho: string) {
   return caminho.split(/[\\/]/).pop() ?? caminho;
+}
+
+function descreverProgresso(p: Progresso | null): string {
+  if (!p) return " · copiando…";
+  if (p.fase === "texto") return ` · extraindo texto, página ${p.pagina} de ${p.total}`;
+  return p.pagina === 0
+    ? ` · preparando OCR para ${p.total} página(s)…`
+    : ` · lendo por OCR, página ${p.pagina} de ${p.total}`;
+}
+
+/** Aviso para abrir junto com o edital recém-importado. */
+function avisoDe(r: ResultadoImport, arquivo: string): string | undefined {
+  if (r.duplicado) return `“${arquivo}” já estava na biblioteca; abrimos o edital existente.`;
+  if (r.falhasOcr.length > 0) return `O OCR falhou nas páginas ${faixas(r.falhasOcr)}; elas ficaram como estavam no PDF.`;
+  return undefined;
 }
 
 export function Biblioteca({
@@ -30,6 +46,7 @@ export function Biblioteca({
   const [andamento, setAndamento] = useState<EmAndamento | null>(null);
   const [falhas, setFalhas] = useState<Falha[]>([]);
   const [arrastando, setArrastando] = useState(false);
+  const cancelamento = useRef<AbortController | null>(null);
 
   const carregar = useCallback(() => {
     ipc.editaisListar().then(setEditais, (e) => setErroLista(toAppError(e)));
@@ -41,24 +58,32 @@ export function Biblioteca({
       if (andamento || caminhos.length === 0) return;
       const novasFalhas: Falha[] = [];
       let ultimo: { id: string; aviso?: string } | null = null;
+      const controle = new AbortController();
+      cancelamento.current = controle;
       for (const caminho of caminhos) {
+        if (controle.signal.aborted) break;
         const arquivo = nomeArquivo(caminho);
         setAndamento({ arquivo, progresso: null });
         try {
-          const r = await importarArquivo(caminho, (progresso) => setAndamento({ arquivo, progresso }));
-          ultimo = {
-            id: r.edital.id,
-            aviso: r.duplicado ? `“${arquivo}” já estava na biblioteca; abrimos o edital existente.` : undefined,
-          };
+          const r = await importarArquivo(caminho, {
+            onProgresso: (progresso) => setAndamento({ arquivo, progresso }),
+            sinal: controle.signal,
+          });
+          ultimo = { id: r.edital.id, aviso: avisoDe(r, arquivo) };
+          if (r.falhasOcr.length > 0 && caminhos.length > 1) {
+            novasFalhas.push({ arquivo, erro: { code: "IMPORT_OCR_FAILED", detail: `páginas ${faixas(r.falhasOcr)}` } });
+          }
         } catch (e) {
-          novasFalhas.push({ arquivo, erro: toAppError(e) });
+          const erro = toAppError(e);
+          if (erro.code !== "IMPORT_CANCELADO") novasFalhas.push({ arquivo, erro });
         }
       }
+      cancelamento.current = null;
       setAndamento(null);
       setFalhas(novasFalhas);
       carregar();
       // Um arquivo só e sem falha: abre direto o edital.
-      if (caminhos.length === 1 && ultimo) onAbrir(ultimo.id, ultimo.aviso);
+      if (caminhos.length === 1 && ultimo && !controle.signal.aborted) onAbrir(ultimo.id, ultimo.aviso);
     },
     [andamento, carregar, onAbrir],
   );
@@ -88,13 +113,20 @@ export function Biblioteca({
 
   async function retomar(e: Edital) {
     setAndamento({ arquivo: e.arquivo_original, progresso: null });
+    const controle = new AbortController();
+    cancelamento.current = controle;
     try {
-      const ed = await retomarImportacao(e.id, (progresso) => setAndamento({ arquivo: e.arquivo_original, progresso }));
-      onAbrir(ed.id);
+      const r = await retomarImportacao(e.id, {
+        onProgresso: (progresso) => setAndamento({ arquivo: e.arquivo_original, progresso }),
+        sinal: controle.signal,
+      });
+      onAbrir(r.edital.id, avisoDe(r, e.arquivo_original));
     } catch (err) {
-      setFalhas([{ arquivo: e.arquivo_original, erro: toAppError(err) }]);
+      const erro = toAppError(err);
+      if (erro.code !== "IMPORT_CANCELADO") setFalhas([{ arquivo: e.arquivo_original, erro }]);
       carregar();
     } finally {
+      cancelamento.current = null;
       setAndamento(null);
     }
   }
@@ -110,10 +142,15 @@ export function Biblioteca({
 
       {andamento && (
         <div className="andamento">
-          Importando <strong>{andamento.arquivo}</strong>
-          {andamento.progresso
-            ? ` · extraindo texto, página ${andamento.progresso.pagina} de ${andamento.progresso.total}`
-            : " · copiando…"}
+          <div className="andamento-topo">
+            <span>
+              Importando <strong>{andamento.arquivo}</strong>
+              {descreverProgresso(andamento.progresso)}
+            </span>
+            <button className="link" onClick={() => cancelamento.current?.abort()}>
+              Cancelar
+            </button>
+          </div>
           {andamento.progresso && (
             <progress value={andamento.progresso.pagina} max={andamento.progresso.total} />
           )}

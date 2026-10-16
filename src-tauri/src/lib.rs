@@ -1,15 +1,19 @@
 mod commands;
-mod domain;
-mod error;
+// Públicos para os testes de integração (tests/), que usam o fake-claude.
+pub mod domain;
+pub mod error;
 mod importacao;
-mod llm;
+pub mod llm;
 mod state;
-mod storage;
+pub mod storage;
 
-use tauri::Manager;
+use std::sync::Arc;
+
+use tauri::{Emitter, Manager};
 use tracing_subscriber::EnvFilter;
 
-use crate::state::{rodar_health_check, AppState};
+use crate::llm::jobs::{Esperas, Fila};
+use crate::state::{rodar_health_check, AmbienteApp, AppState, EVENTO_FECHAR_PEDIDO};
 use crate::storage::{job_repo, AppPaths, Db};
 
 /// Mantém o writer de log vivo enquanto o app roda.
@@ -50,7 +54,9 @@ pub fn run() {
             if orfaos > 0 {
                 tracing::warn!(orfaos, "jobs interrompidos pelo fechamento anterior");
             }
-            app.manage(AppState::new(db, paths));
+            let fila = Fila::nova(&db, Esperas::default());
+            app.manage(AppState::new(db, paths, Arc::clone(&fila)));
+            tauri::async_runtime::spawn(fila.rodar(Arc::new(AmbienteApp(app.handle().clone()))));
 
             // 3. Health check em segundo plano; a UI abre com o indicador em "verificando".
             let handle = app.handle().clone();
@@ -58,6 +64,19 @@ pub fn run() {
                 rodar_health_check(&handle).await;
             });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Com job em execução, a UI pergunta antes; `app_sair` cancela tudo e sai.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let state = window.state::<AppState>();
+                let estado = state.fila.estado(&state.db);
+                if estado.executando.is_some() {
+                    api.prevent_close();
+                    if let Err(e) = window.emit(EVENTO_FECHAR_PEDIDO, estado) {
+                        tracing::warn!(erro = %e, "falha ao pedir confirmação de fechamento");
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::app::app_bootstrap,
@@ -80,6 +99,12 @@ pub fn run() {
             commands::editais::importar_finalizar,
             commands::editais::importar_abortar,
             commands::jobs::jobs_listar,
+            commands::jobs::fila_estado,
+            commands::jobs::job_cancelar,
+            commands::jobs::fila_retomar,
+            commands::jobs::claude_uso,
+            commands::jobs::claude_testar_execucao,
+            commands::jobs::app_sair,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

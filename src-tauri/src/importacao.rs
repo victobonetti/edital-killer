@@ -96,7 +96,10 @@ pub fn retomar(db: &Db, id: &str) -> AppResult<crate::domain::Edital> {
 /// Desfaz uma importação que o pdf.js não conseguiu abrir. Só vale para editais
 /// ainda em `importando`, e só com os códigos de falha de abertura.
 pub fn abortar(db: &Db, paths: &AppPaths, id: &str, code: ErrorCode) -> AppResult<()> {
-    if !matches!(code, ErrorCode::ImportEncrypted | ErrorCode::ImportCorrupted) {
+    if !matches!(
+        code,
+        ErrorCode::ImportEncrypted | ErrorCode::ImportCorrupted | ErrorCode::ImportCancelado
+    ) {
         return Err(AppError::new(
             ErrorCode::InvalidInput,
             format!("código de abortar inválido: {code:?}"),
@@ -218,7 +221,9 @@ mod tests {
             let p = PaginaInput {
                 pagina: 1,
                 texto: "x".into(),
-                itens: vec![ItemTexto { t: "x".into(), i: 0 }],
+                itens: vec![ItemTexto { t: "x".into(), i: 0, b: None }],
+                origem: Default::default(),
+                confianca: None,
             };
             edital_repo::salvar_paginas(&mut conn, &r1.edital.id, &[p]).unwrap();
             edital_repo::finalizar_importacao(&conn, &r1.edital.id, 1).unwrap();

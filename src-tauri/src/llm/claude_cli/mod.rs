@@ -3,6 +3,9 @@
 
 pub mod discovery;
 pub mod health;
+pub mod processo;
+pub mod runner;
+pub mod stream;
 
 use async_trait::async_trait;
 

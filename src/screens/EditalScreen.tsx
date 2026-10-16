@@ -2,18 +2,30 @@ import { useEffect, useState } from "react";
 import type { AppError } from "../bindings/AppError";
 import type { Edital } from "../bindings/Edital";
 import { ErrorBox } from "../components/ErrorBox";
+import { faixas } from "../components/faixas";
 import { PdfViewer } from "../components/pdf/PdfViewer";
 import { ipc, toAppError } from "../ipc";
 import { CATALOGO } from "../ipc/errors";
 
-function faixas(paginas: number[]): string {
-  const out: string[] = [];
-  for (let i = 0; i < paginas.length; i++) {
-    const ini = paginas[i];
-    while (i + 1 < paginas.length && paginas[i + 1] === paginas[i] + 1) i++;
-    out.push(ini === paginas[i] ? `${ini}` : `${ini}–${paginas[i]}`);
-  }
-  return out.join(", ");
+/** Avisos de qualidade das páginas, já depois do OCR. */
+function AvisoPaginas({ edital }: { edital: Edital }) {
+  const semTexto = edital.paginas_problema.filter((p) => p.qualidade === "sem_texto").map((p) => p.pagina);
+  const suspeitas = edital.paginas_problema.filter((p) => p.qualidade === "suspeito").map((p) => p.pagina);
+  if (semTexto.length === 0 && suspeitas.length === 0 && edital.paginas_ocr.length === 0) return null;
+  return (
+    <div className="aviso aviso-coluna">
+      {semTexto.length > 0 && <span>Páginas sem texto, mesmo com OCR: {faixas(semTexto)}.</span>}
+      {suspeitas.length > 0 && (
+        <span>Páginas com texto de leitura duvidosa: {faixas(suspeitas)}. Confira o conteúdo delas no PDF.</span>
+      )}
+      {edital.paginas_ocr.length > 0 && (
+        <span className="mudo">Texto obtido por OCR nas páginas {faixas(edital.paginas_ocr)}.</span>
+      )}
+      {edital.exige_confirmacao && (
+        <strong>Mais de 20% das páginas têm problema: o processamento vai pedir confirmação.</strong>
+      )}
+    </div>
+  );
 }
 
 export function EditalScreen({
@@ -76,12 +88,7 @@ export function EditalScreen({
         )}
         {erro && <ErrorBox erro={erro} onFechar={() => setErro(null)} />}
         {semTexto && <ErrorBox erro={{ code: "EDITAL_SEM_TEXTO", detail: "" }} />}
-        {!semTexto && edital.paginas_sem_texto.length > 0 && (
-          <div className="aviso">
-            Páginas sem texto extraível: {faixas(edital.paginas_sem_texto)}. O conteúdo dessas páginas (provavelmente
-            imagens) não será considerado no processamento.
-          </div>
-        )}
+        {!semTexto && <AvisoPaginas edital={edital} />}
       </div>
 
       <div className="edital-corpo">

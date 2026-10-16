@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::qualidade::{OrigemTexto, QualidadeTexto};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -9,7 +11,7 @@ pub enum EditalStatus {
     Importando,
     /// Texto extraído e salvo; pronto para processamento.
     Importado,
-    /// Nenhuma página com texto: processamento bloqueado (sem OCR no Passo 1).
+    /// Nenhuma página com texto legível, nem depois do OCR: processamento bloqueado.
     SemTexto,
 }
 
@@ -43,20 +45,36 @@ pub struct Edital {
     pub arquivo_original: String,
     pub sha256: String,
     pub total_paginas: Option<u32>,
-    /// Números (1-based) das páginas sem texto extraível.
-    pub paginas_sem_texto: Vec<u32>,
+    /// Páginas sem texto ou com texto ilegível, depois do OCR.
+    pub paginas_problema: Vec<PaginaProblema>,
+    /// Números (1-based) das páginas cujo texto veio do OCR.
+    pub paginas_ocr: Vec<u32>,
+    /// Mais de 20% das páginas com problema: processar exige confirmação.
+    pub exige_confirmacao: bool,
     pub status: EditalStatus,
     /// ISO 8601 (UTC).
     pub importado_em: String,
 }
 
-/// Trecho de texto da camada do pdf.js, com o índice onde começa no texto da página.
-/// Índices são em unidades UTF-16 (o que `String.length` mede no JS).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PaginaProblema {
+    pub pagina: u32,
+    pub qualidade: QualidadeTexto,
+}
+
+/// Trecho de texto (item do pdf.js ou palavra do OCR), com o índice onde começa no
+/// texto da página. Índices são em unidades UTF-16 (o que `String.length` mede no JS).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct ItemTexto {
     pub t: String,
     pub i: u32,
+    /// Só no OCR: caixa `[x, y, largura, altura]` em pontos, a partir do canto superior
+    /// esquerdo da página (viewport do pdf.js em escala 1). Permite destacar sem camada de texto.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub b: Option<[f32; 4]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -66,6 +84,12 @@ pub struct PaginaInput {
     pub pagina: u32,
     pub texto: String,
     pub itens: Vec<ItemTexto>,
+    #[serde(default)]
+    pub origem: OrigemTexto,
+    /// Confiança média do tesseract (0–100), só no OCR.
+    #[serde(default)]
+    #[ts(optional)]
+    pub confianca: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

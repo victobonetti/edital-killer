@@ -25,3 +25,6 @@ dist-ssr
 
 # Rust
 src-tauri/target
+
+# Arquivos do OCR, gerados por scripts/ocr-assets.mjs
+public/ocr
