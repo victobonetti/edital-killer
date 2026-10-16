@@ -1,0 +1,190 @@
+import { useEffect, useState } from "react";
+import type { AppError } from "../bindings/AppError";
+import type { Edital } from "../bindings/Edital";
+import { ErrorBox } from "../components/ErrorBox";
+import { PdfViewer } from "../components/pdf/PdfViewer";
+import { ipc, toAppError } from "../ipc";
+import { CATALOGO } from "../ipc/errors";
+
+function faixas(paginas: number[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < paginas.length; i++) {
+    const ini = paginas[i];
+    while (i + 1 < paginas.length && paginas[i + 1] === paginas[i] + 1) i++;
+    out.push(ini === paginas[i] ? `${ini}` : `${ini}–${paginas[i]}`);
+  }
+  return out.join(", ");
+}
+
+export function EditalScreen({
+  id,
+  aviso,
+  onVoltar,
+}: {
+  id: string;
+  aviso?: string;
+  onVoltar: () => void;
+}) {
+  const [edital, setEdital] = useState<Edital | null>(null);
+  const [erro, setErro] = useState<AppError | null>(null);
+  const [mostrarAviso, setMostrarAviso] = useState(!!aviso);
+
+  useEffect(() => {
+    ipc.editalObter(id).then(setEdital, (e) => setErro(toAppError(e)));
+  }, [id]);
+
+  async function remover() {
+    if (!edital) return;
+    const ok = window.confirm(
+      `Remover “${edital.nome}”? Isso apaga o PDF copiado, o texto extraído e os registros de processamento. Não dá para desfazer.`,
+    );
+    if (!ok) return;
+    try {
+      await ipc.editalRemover(edital.id);
+      onVoltar();
+    } catch (e) {
+      setErro(toAppError(e));
+    }
+  }
+
+  if (!edital) {
+    return (
+      <main className="tela">
+        <button className="link" onClick={onVoltar}>
+          ← Biblioteca
+        </button>
+        {erro ? <ErrorBox erro={erro} /> : <p className="mudo">Carregando…</p>}
+      </main>
+    );
+  }
+
+  const semTexto = edital.status === "sem_texto";
+  return (
+    <main className="tela edital">
+      <div className="edital-topo">
+        <button className="link" onClick={onVoltar}>
+          ← Biblioteca
+        </button>
+        <Cabecalho edital={edital} onSalvo={setEdital} onErro={setErro} />
+        {mostrarAviso && aviso && (
+          <div className="aviso">
+            {aviso}
+            <button className="link" onClick={() => setMostrarAviso(false)} aria-label="Fechar">
+              ✕
+            </button>
+          </div>
+        )}
+        {erro && <ErrorBox erro={erro} onFechar={() => setErro(null)} />}
+        {semTexto && <ErrorBox erro={{ code: "EDITAL_SEM_TEXTO", detail: "" }} />}
+        {!semTexto && edital.paginas_sem_texto.length > 0 && (
+          <div className="aviso">
+            Páginas sem texto extraível: {faixas(edital.paginas_sem_texto)}. O conteúdo dessas páginas (provavelmente
+            imagens) não será considerado no processamento.
+          </div>
+        )}
+      </div>
+
+      <div className="edital-corpo">
+        <section className="edital-pdf">
+          <PdfViewer editalId={edital.id} />
+        </section>
+        <aside className="edital-lateral">
+          <h2>Cargos</h2>
+          <p className="mudo">
+            {semTexto
+              ? CATALOGO.EDITAL_SEM_TEXTO.explicacao
+              : "A localização de cargos com o Claude chega na próxima etapa da implementação."}
+          </p>
+          <div className="acoes">
+            <button className="primario" disabled title="Disponível com a integração do Claude">
+              Localizar cargos
+            </button>
+          </div>
+          <hr />
+          <dl className="meta">
+            <dt>Arquivo</dt>
+            <dd>{edital.arquivo_original}</dd>
+            <dt>Páginas</dt>
+            <dd>{edital.total_paginas ?? "—"}</dd>
+            <dt>Importado em</dt>
+            <dd>{new Date(edital.importado_em).toLocaleString("pt-BR")}</dd>
+            <dt>SHA-256</dt>
+            <dd className="hash">{edital.sha256}</dd>
+          </dl>
+          <button className="perigo" onClick={remover}>
+            Remover edital
+          </button>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function Cabecalho({
+  edital,
+  onSalvo,
+  onErro,
+}: {
+  edital: Edital;
+  onSalvo: (e: Edital) => void;
+  onErro: (e: AppError) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [nome, setNome] = useState(edital.nome);
+  const [orgao, setOrgao] = useState(edital.orgao ?? "");
+  const [banca, setBanca] = useState(edital.banca ?? "");
+
+  function abrir() {
+    setNome(edital.nome);
+    setOrgao(edital.orgao ?? "");
+    setBanca(edital.banca ?? "");
+    setEditando(true);
+  }
+
+  async function salvar(ev: React.FormEvent) {
+    ev.preventDefault();
+    try {
+      onSalvo(await ipc.editalAtualizar(edital.id, { nome, orgao: orgao || null, banca: banca || null }));
+      setEditando(false);
+    } catch (e) {
+      onErro(toAppError(e));
+    }
+  }
+
+  if (!editando) {
+    return (
+      <header className="cabecalho">
+        <h1>{edital.nome}</h1>
+        <p className="mudo">
+          {[edital.orgao, edital.banca].filter(Boolean).join(" · ") || "Órgão e banca não informados"}
+          {" · "}
+          <button className="link" onClick={abrir}>
+            Editar
+          </button>
+        </p>
+      </header>
+    );
+  }
+  return (
+    <form className="cabecalho form-linha" onSubmit={salvar}>
+      <label>
+        Nome
+        <input value={nome} onChange={(e) => setNome(e.target.value)} required autoFocus />
+      </label>
+      <label>
+        Órgão
+        <input value={orgao} onChange={(e) => setOrgao(e.target.value)} />
+      </label>
+      <label>
+        Banca
+        <input value={banca} onChange={(e) => setBanca(e.target.value)} />
+      </label>
+      <button className="primario" type="submit">
+        Salvar
+      </button>
+      <button type="button" onClick={() => setEditando(false)}>
+        Cancelar
+      </button>
+    </form>
+  );
+}
