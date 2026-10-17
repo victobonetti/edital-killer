@@ -14,6 +14,7 @@ App desktop (Tauri 2 + React) que importa editais em PDF e extrai o conteúdo pr
 ```sh
 npm install
 npm run tauri dev      # app em modo desenvolvimento
+npm run dev            # só a UI no navegador, com o core simulado (src/dev/mockIpc.ts)
 npm test               # testes da UI (Vitest)
 cd src-tauri && cargo test   # testes do core; também regenera src/bindings (ts-rs)
 ```
@@ -22,7 +23,7 @@ cd src-tauri && cargo test   # testes do core; também regenera src/bindings (ts
 
 | Item | Situação |
 | --- | --- |
-| 1. App desktop | Telas Biblioteca, Edital, Setup e Configurações; barra de status do Claude; painel de jobs (somente leitura); SQLite com migrações; logs rotacionados |
+| 1. App desktop | Telas Biblioteca, Edital (visão consolidada + documento original), Setup e Ajustes; indicador do Claude no cabeçalho; caminho, modelo, timeout, histórico de jobs e logs recolhidos em Ajustes › Avançado; SQLite com migrações; logs rotacionados |
 | 2. Upload do edital | Completo: dialog e arrastar-soltar, validação `%PDF`, SHA-256, duplicatas, extração por página com pdf.js, normalização com mapa de índices, remoção |
 | 3. Claude CLI | Descoberta e health check (`--version`, `auth status`). Falta: runner, fila de jobs, catálogo de erros de execução, cancelamento ao fechar |
 | 4. Extração | Não iniciado |

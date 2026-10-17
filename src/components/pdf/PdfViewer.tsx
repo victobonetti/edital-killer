@@ -5,9 +5,10 @@ import { ErrorBox } from "../ErrorBox";
 import { abrirPdfDoEdital, type PDFDocumentProxy } from "./pdfjs";
 
 /** Visualizador do PDF do edital. Páginas são renderizadas quando entram na tela. */
-export function PdfViewer({ editalId }: { editalId: string }) {
+export function PdfViewer({ editalId, pagina }: { editalId: string; pagina?: { n: number } | null }) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [erro, setErro] = useState<AppError | null>(null);
+  const raiz = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -28,10 +29,16 @@ export function PdfViewer({ editalId }: { editalId: string }) {
     };
   }, [editalId]);
 
-  if (erro) return <ErrorBox erro={erro} contexto="Visualizador" />;
-  if (!doc) return <p className="mudo">Carregando PDF…</p>;
+  // Leva até a página pedida (ex.: clique na referência de um tópico). Objeto novo a cada pedido.
+  useEffect(() => {
+    if (!doc || !pagina) return;
+    raiz.current?.querySelector(`[data-pagina="${pagina.n}"]`)?.scrollIntoView({ block: "start" });
+  }, [doc, pagina]);
+
+  if (erro) return <ErrorBox erro={erro} contexto="Documento" />;
+  if (!doc) return <p className="mudo carregando">Abrindo o documento…</p>;
   return (
-    <div className="pdf-viewer">
+    <div className="pdf-viewer" ref={raiz}>
       {Array.from({ length: doc.numPages }, (_, i) => (
         <Pagina key={i + 1} doc={doc} numero={i + 1} />
       ))}
