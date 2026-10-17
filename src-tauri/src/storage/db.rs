@@ -10,6 +10,7 @@ use crate::error::{AppError, AppResult, ErrorCode};
 const MIGRATIONS: &[&str] = &[
     include_str!("migrations/001_inicial.sql"),
     include_str!("migrations/002_extracao.sql"),
+    include_str!("migrations/003_estrutura_prova.sql"),
 ];
 
 pub struct Db {

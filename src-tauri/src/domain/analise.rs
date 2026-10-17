@@ -41,7 +41,37 @@ pub struct Materia {
     pub id: String,
     pub nome: String,
     pub pagina: Option<u32>,
+    /// Bloco da prova (ex.: "Conhecimentos Gerais"), do quadro de provas.
+    pub bloco: Option<String>,
+    /// Questões da matéria; `None` quando o edital só informa por bloco.
+    pub questoes: Option<u32>,
+    pub peso: Option<f64>,
+    /// Bloco, questões e peso foram confirmados no texto do edital.
+    pub quadro_verificado: bool,
     pub topicos: Vec<Topico>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BlocoProva {
+    pub nome: String,
+    /// Questões do bloco, quando o edital informa por bloco.
+    pub questoes: Option<u32>,
+    /// Percentual (0–100) dos pontos do bloco exigido para não ser eliminado.
+    pub minimo: Option<f64>,
+    pub verificado: bool,
+}
+
+/// Quadro de provas do cargo escolhido.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EstruturaProva {
+    pub duracao_minutos: Option<u32>,
+    pub duracao_verificada: bool,
+    /// Percentual (0–100) do total de pontos exigido.
+    pub minimo_geral: Option<f64>,
+    pub minimo_verificado: bool,
+    pub blocos: Vec<BlocoProva>,
 }
 
 /// Etapa da análise que um job executa.
@@ -92,5 +122,7 @@ pub struct Analise {
     pub cargo_escolhido: Option<String>,
     /// `None` = conteúdo do cargo escolhido ainda não extraído.
     pub materias: Option<Vec<Materia>>,
+    /// Quadro de provas do cargo escolhido, extraído junto com o conteúdo.
+    pub estrutura: Option<EstruturaProva>,
     pub andamento: Option<Andamento>,
 }

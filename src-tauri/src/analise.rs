@@ -95,6 +95,28 @@ pub fn enfileirar(state: &AppState, edital_id: &str, etapa: EtapaAnalise) -> App
         .map_err(|_| AppError::new(ErrorCode::Internal, "fila de análises parada"))
 }
 
+/// Começa a análise de um edital recém-importado. Falhas só vão para o log: a
+/// importação já deu certo e o usuário pode iniciar a análise pela tela.
+pub fn iniciar_apos_importacao(state: &AppState, edital_id: &str) {
+    match enfileirar(state, edital_id, EtapaAnalise::Localizar) {
+        Ok(()) => tracing::info!(edital = edital_id, "análise iniciada pela importação"),
+        Err(e) => tracing::warn!(edital = edital_id, erro = %e, "análise não iniciada na importação"),
+    }
+}
+
+/// Edital com um cargo só: não há o que perguntar; escolhe e já extrai o conteúdo.
+/// Devolve se seguiu.
+pub fn seguir_com_cargo_unico(state: &AppState, edital_id: &str) -> AppResult<bool> {
+    let cargos = analise_repo::cargos(&*state.db.conn()?, edital_id)?;
+    let [unico] = cargos.as_slice() else {
+        return Ok(false);
+    };
+    analise_repo::escolher_cargo(&*state.db.conn()?, edital_id, &unico.id)?;
+    enfileirar(state, edital_id, EtapaAnalise::Extrair)?;
+    tracing::info!(edital = edital_id, cargo = %unico.nome, "cargo único escolhido automaticamente");
+    Ok(true)
+}
+
 /// Cargos, conteúdo e andamento do edital, como a tela mostra.
 pub fn carregar(db: &Db, edital_id: &str) -> AppResult<Analise> {
     let conn = db.conn()?;
@@ -156,6 +178,11 @@ async fn processar(app: &AppHandle, p: Pedido) {
         caminho_manual: settings.claude_path.clone(),
     };
     let r = executar(&state.db, &state.paths, &backend, &p, &settings, cancel).await;
+    if r.is_ok() && p.etapa == EtapaAnalise::Localizar {
+        if let Err(e) = seguir_com_cargo_unico(&state, &p.edital_id) {
+            tracing::warn!(erro = %e, "falha ao seguir com o cargo único");
+        }
+    }
 
     if let Ok(mut a) = state.fila.atual.lock() {
         *a = None;
@@ -314,6 +341,38 @@ mod tests {
         let and = carregar(&db, "e1").unwrap().andamento.unwrap();
         assert_eq!(and.status, JobStatus::Cancelado);
         assert!(and.erro.is_none());
+    }
+
+    #[tokio::test]
+    async fn cargo_unico_segue_sozinho_para_a_extracao() {
+        let (db, paths, _d) = ambiente();
+        let p = pedido(&db, EtapaAnalise::Localizar);
+        executar(&db, &paths, &Fake(Ok(cargos())), &p, &Settings::default(), CancelToken::default())
+            .await
+            .unwrap();
+        let state = AppState::new(db, paths);
+        assert!(seguir_com_cargo_unico(&state, "e1").unwrap());
+        let a = carregar(&state.db, "e1").unwrap();
+        assert_eq!(a.cargo_escolhido.as_deref(), Some(a.cargos[0].id.as_str()));
+        let and = a.andamento.unwrap();
+        assert_eq!((and.etapa, and.status), (EtapaAnalise::Extrair, JobStatus::NaFila));
+    }
+
+    #[tokio::test]
+    async fn varios_cargos_esperam_a_escolha() {
+        let (db, paths, _d) = ambiente();
+        let p = pedido(&db, EtapaAnalise::Localizar);
+        let mut dois = cargos();
+        dois["cargos"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"nome": "Cargo inventado", "vagas": 1, "escolaridade": null, "pagina": 2}));
+        executar(&db, &paths, &Fake(Ok(dois)), &p, &Settings::default(), CancelToken::default())
+            .await
+            .unwrap();
+        let state = AppState::new(db, paths);
+        assert!(!seguir_com_cargo_unico(&state, "e1").unwrap());
+        assert_eq!(carregar(&state.db, "e1").unwrap().cargo_escolhido, None);
     }
 
     /// Usa o `claude` instalado e logado (gasta uso da conta). Rodar com:

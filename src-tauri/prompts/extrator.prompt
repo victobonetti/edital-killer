@@ -4,11 +4,24 @@ O cargo é: **{{CARGO}}**
 
 Use as ferramentas Grep e Read. O conteúdo programático costuma ficar num anexo no fim do edital ("ANEXO", "CONTEÚDO PROGRAMÁTICO", "CONHECIMENTOS GERAIS", "CONHECIMENTOS ESPECÍFICOS"). Leia o anexo inteiro antes de responder.
 
+## 1. Estrutura da prova objetiva (`prova`)
+
+Procure o quadro de provas desse cargo (busque "QUADRO", "PROVA OBJETIVA", "NÚMERO DE QUESTÕES", "PESO", "CARÁTER", "HABILITADO", "ELIMINAD"). Considere só a prova objetiva: ignore discursiva, redação, títulos e prova prática.
+
+- `duracao_minutos`: a duração da prova objetiva em minutos (ex.: 4h30 = 270). Se a duração inclui a discursiva, use-a assim mesmo.
+- `minimo_geral`: o percentual mínimo do total de pontos da prova objetiva para não ser eliminado (ex.: "60% dos pontos" = 60). Se o edital diz em pontos ou acertos, converta em percentual do total.
+- `blocos`: os blocos da prova objetiva (ex.: "Conhecimentos Gerais", "Conhecimentos Específicos"), na ordem do quadro. Para cada um: `nome`, `questoes` (o total do bloco, se o edital informar por bloco; senão `null`), `minimo` (percentual mínimo dos pontos do bloco, ou `null`), e `trecho`/`pagina`. Se a prova não tiver blocos, devolva uma lista vazia.
+
+Para `duracao_minutos` e `minimo_geral`, devolva `valor`, `trecho` e `pagina`, ou `null` se o edital não informar. O `trecho` é uma **cópia exata** de 3 a 15 palavras do edital que contém a informação.
+
+## 2. Matérias e tópicos (`materias`)
+
 Inclua **todas** as matérias que caem na prova desse cargo: as comuns a todos os cargos (conhecimentos gerais, básicos) e as específicas dele. Não inclua matérias de outros cargos.
 
 Para cada matéria:
 - `nome`: o nome da matéria como no edital, sem a numeração (ex.: "Língua Portuguesa").
 - `pagina`: a página onde a matéria começa.
+- `quadro`: o que o quadro de provas diz da matéria: `bloco` (nome do bloco a que pertence, igual ao de `prova.blocos`), `questoes` (número de questões da matéria, ou `null` se o edital só informa por bloco), `peso` (peso de cada questão; `1` se o edital não diferencia pesos), e `trecho`/`pagina` copiados da linha do quadro que traz esses números (ex.: "Língua Portuguesa 15 1"). Se a matéria não aparece no quadro, use `null` em tudo.
 - `topicos`: os itens da matéria, na ordem do edital.
 
 Para cada tópico:

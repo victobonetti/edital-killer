@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
 use tauri::ipc::Response;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::domain::{Edital, EditalStatus, EditalUpdate, ImportStart, PaginaInput};
+use crate::analise;
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::importacao;
 use crate::state::AppState;
@@ -84,16 +85,24 @@ pub async fn importar_paginas(
     edital_repo::salvar_paginas(&mut conn, &id, &paginas)
 }
 
+/// Fecha a importação e, se o PDF tem texto, já começa a análise.
 #[tauri::command]
 pub async fn importar_finalizar(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     total_paginas: u32,
 ) -> AppResult<Edital> {
-    let conn = state.db.conn()?;
-    exigir_importando(&edital_repo::get(&conn, &id)?)?;
-    let e = edital_repo::finalizar_importacao(&conn, &id, total_paginas)?;
+    let e = {
+        let conn = state.db.conn()?;
+        exigir_importando(&edital_repo::get(&conn, &id)?)?;
+        edital_repo::finalizar_importacao(&conn, &id, total_paginas)?
+    };
     tracing::info!(edital = %id, total_paginas, sem_texto = e.paginas_sem_texto.len(), status = ?e.status, "importação concluída");
+    if e.status == EditalStatus::Importado {
+        analise::iniciar_apos_importacao(&state, &id);
+        let _ = app.emit(analise::EVENTO_ANALISE, &id);
+    }
     Ok(e)
 }
 

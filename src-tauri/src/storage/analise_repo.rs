@@ -1,6 +1,6 @@
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::domain::{Analise, Cargo, Materia, Topico};
+use crate::domain::{Analise, BlocoProva, Cargo, EstruturaProva, Materia, Topico};
 use crate::error::{AppError, AppResult, ErrorCode};
 
 /// Texto de uma página como foi salvo na importação.
@@ -108,20 +108,56 @@ pub fn cargo_escolhido(conn: &Connection, edital_id: &str) -> AppResult<Option<C
     }
 }
 
-/// Substitui o conteúdo programático de um cargo.
-pub fn substituir_conteudo(conn: &mut Connection, cargo_id: &str, materias: &[Materia]) -> AppResult<()> {
+/// Substitui o conteúdo programático e o quadro de provas de um cargo.
+pub fn substituir_conteudo(
+    conn: &mut Connection,
+    cargo_id: &str,
+    materias: &[Materia],
+    estrutura: &EstruturaProva,
+) -> AppResult<()> {
     let tx = conn.transaction()?;
     tx.execute("DELETE FROM materia WHERE cargo_id = ?1", [cargo_id])?;
+    tx.execute("DELETE FROM estrutura_prova WHERE cargo_id = ?1", [cargo_id])?;
+    tx.execute("DELETE FROM bloco_prova WHERE cargo_id = ?1", [cargo_id])?;
+    tx.execute(
+        "INSERT INTO estrutura_prova (cargo_id, duracao_minutos, duracao_verificada, minimo_geral, minimo_verificado)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![
+            cargo_id,
+            estrutura.duracao_minutos,
+            estrutura.duracao_verificada,
+            estrutura.minimo_geral,
+            estrutura.minimo_verificado
+        ],
+    )?;
     {
+        let mut b_stmt = tx.prepare(
+            "INSERT INTO bloco_prova (cargo_id, ordem, nome, questoes, minimo, verificado)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        )?;
+        for (i, b) in estrutura.blocos.iter().enumerate() {
+            b_stmt.execute(params![cargo_id, i as u32, b.nome, b.questoes, b.minimo, b.verificado])?;
+        }
         let mut m_stmt = tx.prepare(
-            "INSERT INTO materia (id, cargo_id, ordem, nome, pagina) VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO materia (id, cargo_id, ordem, nome, pagina, bloco, questoes, peso, quadro_verificado)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )?;
         let mut t_stmt = tx.prepare(
             "INSERT INTO topico (id, materia_id, pai_id, ordem, texto, pagina, inicio, fim, verificado)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )?;
         for (i, m) in materias.iter().enumerate() {
-            m_stmt.execute(params![m.id, cargo_id, i as u32, m.nome, m.pagina])?;
+            m_stmt.execute(params![
+                m.id,
+                cargo_id,
+                i as u32,
+                m.nome,
+                m.pagina,
+                m.bloco,
+                m.questoes,
+                m.peso,
+                m.quadro_verificado
+            ])?;
             for (j, t) in m.topicos.iter().enumerate() {
                 let mut inserir = |t: &Topico, pai: Option<&str>, ordem: usize| {
                     t_stmt.execute(params![
@@ -169,14 +205,20 @@ pub fn cargos(conn: &Connection, edital_id: &str) -> AppResult<Vec<Cargo>> {
 
 /// `None` quando o cargo ainda não teve o conteúdo extraído.
 pub fn materias(conn: &Connection, cargo_id: &str) -> AppResult<Option<Vec<Materia>>> {
-    let mut stmt =
-        conn.prepare("SELECT id, nome, pagina FROM materia WHERE cargo_id = ?1 ORDER BY ordem")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, nome, pagina, bloco, questoes, peso, quadro_verificado FROM materia
+         WHERE cargo_id = ?1 ORDER BY ordem",
+    )?;
     let mut materias = stmt
         .query_map([cargo_id], |r| {
             Ok(Materia {
                 id: r.get(0)?,
                 nome: r.get(1)?,
                 pagina: r.get(2)?,
+                bloco: r.get(3)?,
+                questoes: r.get(4)?,
+                peso: r.get(5)?,
+                quadro_verificado: r.get(6)?,
                 topicos: Vec::new(),
             })
         })?
@@ -216,18 +258,55 @@ pub fn materias(conn: &Connection, cargo_id: &str) -> AppResult<Option<Vec<Mater
     Ok(Some(materias))
 }
 
+pub fn estrutura(conn: &Connection, cargo_id: &str) -> AppResult<Option<EstruturaProva>> {
+    let Some(mut e) = conn
+        .query_row(
+            "SELECT duracao_minutos, duracao_verificada, minimo_geral, minimo_verificado
+             FROM estrutura_prova WHERE cargo_id = ?1",
+            [cargo_id],
+            |r| {
+                Ok(EstruturaProva {
+                    duracao_minutos: r.get(0)?,
+                    duracao_verificada: r.get(1)?,
+                    minimo_geral: r.get(2)?,
+                    minimo_verificado: r.get(3)?,
+                    blocos: Vec::new(),
+                })
+            },
+        )
+        .optional()?
+    else {
+        return Ok(None);
+    };
+    let mut stmt = conn.prepare(
+        "SELECT nome, questoes, minimo, verificado FROM bloco_prova WHERE cargo_id = ?1 ORDER BY ordem",
+    )?;
+    e.blocos = stmt
+        .query_map([cargo_id], |r| {
+            Ok(BlocoProva {
+                nome: r.get(0)?,
+                questoes: r.get(1)?,
+                minimo: r.get(2)?,
+                verificado: r.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Some(e))
+}
+
 /// Cargos e conteúdo do edital, sem o andamento (que vem dos jobs).
 pub fn carregar(conn: &Connection, edital_id: &str) -> AppResult<Analise> {
     let cargos = cargos(conn, edital_id)?;
     let escolhido = cargo_escolhido(conn, edital_id)?;
-    let materias = match &escolhido {
-        Some(c) => materias(conn, &c.id)?,
-        None => None,
+    let (materias, estrutura) = match &escolhido {
+        Some(c) => (materias(conn, &c.id)?, estrutura(conn, &c.id)?),
+        None => (None, None),
     };
     Ok(Analise {
         cargos,
         cargo_escolhido: escolhido.map(|c| c.id),
         materias,
+        estrutura,
         andamento: None,
     })
 }
@@ -285,17 +364,34 @@ mod tests {
             id: "m1".into(),
             nome: "Português".into(),
             pagina: Some(5),
+            bloco: Some("Conhecimentos Gerais".into()),
+            questoes: Some(15),
+            peso: Some(1.0),
+            quadro_verificado: true,
             topicos: vec![
                 topico("t1", vec![topico("t1a", vec![]), topico("t1b", vec![])]),
                 topico("t2", vec![]),
             ],
         };
-        substituir_conteudo(&mut conn, "c2", &[m.clone()]).unwrap();
+        let estrutura = EstruturaProva {
+            duracao_minutos: Some(270),
+            duracao_verificada: true,
+            minimo_geral: Some(50.0),
+            minimo_verificado: false,
+            blocos: vec![BlocoProva {
+                nome: "Conhecimentos Gerais".into(),
+                questoes: None,
+                minimo: Some(40.0),
+                verificado: true,
+            }],
+        };
+        substituir_conteudo(&mut conn, "c2", &[m.clone()], &estrutura).unwrap();
 
         let a = carregar(&conn, "e1").unwrap();
         assert_eq!(a.cargos.len(), 2);
         assert_eq!(a.cargo_escolhido.as_deref(), Some("c2"));
         assert_eq!(a.materias.unwrap(), vec![m]);
+        assert_eq!(a.estrutura, Some(estrutura));
 
         // Nova localização zera escolha e conteúdo.
         substituir_cargos(&mut conn, "e1", &[cargo("c3")]).unwrap();

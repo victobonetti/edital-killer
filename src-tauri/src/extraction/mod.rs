@@ -12,7 +12,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::domain::normalize::normalizar;
-use crate::domain::{Cargo, EtapaAnalise, Materia, Settings, Topico};
+use crate::domain::{BlocoProva, Cargo, EstruturaProva, EtapaAnalise, Materia, Settings, Topico};
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::llm::backend::Execucao;
 use crate::storage::analise_repo::{self, PaginaBusca};
@@ -118,7 +118,8 @@ pub fn aplicar(db: &Db, edital_id: &str, etapa: EtapaAnalise, saida: Value) -> A
                     "a resposta não trouxe nenhuma matéria",
                 ));
             }
-            analise_repo::substituir_conteudo(&mut conn, &cargo.id, &materias)
+            let estrutura = estrutura_verificada(&paginas, lido.prova);
+            analise_repo::substituir_conteudo(&mut conn, &cargo.id, &materias, &estrutura)
         }
     }
 }
@@ -223,14 +224,71 @@ fn cargos_verificados(paginas: &[PaginaBusca], cargos: Vec<CargoSaida>) -> Vec<C
 
 #[derive(Deserialize)]
 struct Extraido {
+    prova: ProvaSaida,
     materias: Vec<MateriaSaida>,
+}
+
+#[derive(Deserialize)]
+struct ProvaSaida {
+    duracao_minutos: Option<Numero>,
+    minimo_geral: Option<Numero>,
+    blocos: Vec<BlocoSaida>,
+}
+
+#[derive(Deserialize)]
+struct Numero {
+    valor: f64,
+    trecho: String,
+    pagina: u32,
+}
+
+#[derive(Deserialize)]
+struct BlocoSaida {
+    nome: String,
+    questoes: Option<u32>,
+    minimo: Option<f64>,
+    trecho: String,
+    pagina: u32,
 }
 
 #[derive(Deserialize)]
 struct MateriaSaida {
     nome: String,
     pagina: u32,
+    quadro: QuadroSaida,
     topicos: Vec<TopicoSaida>,
+}
+
+#[derive(Deserialize)]
+struct QuadroSaida {
+    bloco: Option<String>,
+    questoes: Option<u32>,
+    peso: Option<f64>,
+    trecho: Option<String>,
+    pagina: Option<u32>,
+}
+
+/// Quadros de provas viram texto fragmentado no PDF: o dado não verificado fica,
+/// marcado, para a UI pedir conferência.
+fn estrutura_verificada(paginas: &[PaginaBusca], p: ProvaSaida) -> EstruturaProva {
+    let confere = |n: &Numero| localizar(paginas, Some(n.pagina), &n.trecho).is_some();
+    EstruturaProva {
+        duracao_minutos: p.duracao_minutos.as_ref().map(|n| n.valor.round() as u32),
+        duracao_verificada: p.duracao_minutos.as_ref().is_some_and(confere),
+        minimo_geral: p.minimo_geral.as_ref().map(|n| n.valor),
+        minimo_verificado: p.minimo_geral.as_ref().is_some_and(confere),
+        blocos: p
+            .blocos
+            .into_iter()
+            .filter(|b| !b.nome.trim().is_empty())
+            .map(|b| BlocoProva {
+                verificado: localizar(paginas, Some(b.pagina), &b.trecho).is_some(),
+                nome: b.nome.trim().to_owned(),
+                questoes: b.questoes,
+                minimo: b.minimo,
+            })
+            .collect(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -245,11 +303,22 @@ fn materias_verificadas(paginas: &[PaginaBusca], materias: Vec<MateriaSaida>) ->
     materias
         .into_iter()
         .filter(|m| !m.nome.trim().is_empty())
-        .map(|m| Materia {
-            id: novo_id(),
-            nome: m.nome.trim().to_owned(),
-            pagina: Some(localizar(paginas, Some(m.pagina), &m.nome).map_or(m.pagina, |a| a.pagina)),
-            topicos: m.topicos.into_iter().map(|t| topico(paginas, t)).collect(),
+        .map(|m| {
+            let q = m.quadro;
+            let quadro_verificado = q
+                .trecho
+                .as_deref()
+                .is_some_and(|t| localizar(paginas, q.pagina, t).is_some());
+            Materia {
+                id: novo_id(),
+                nome: m.nome.trim().to_owned(),
+                pagina: Some(localizar(paginas, Some(m.pagina), &m.nome).map_or(m.pagina, |a| a.pagina)),
+                bloco: q.bloco.map(|b| b.trim().to_owned()).filter(|b| !b.is_empty()),
+                questoes: q.questoes,
+                peso: q.peso,
+                quadro_verificado,
+                topicos: m.topicos.into_iter().map(|t| topico(paginas, t)).collect(),
+            }
         })
         .collect()
 }
@@ -299,7 +368,7 @@ pub(crate) mod tests_apoio {
             &[
                 p(1, "EDITAL Nº 01/2026 — CONCURSO PÚBLICO\nTRIBUNAL DE CONTAS DO ESTADO\nA prova será realizada em 14 de março de 2027."),
                 p(2, "QUADRO DE CARGOS\nAuditor de Controle Externo – TI   12 vagas"),
-                p(3, "ANEXO I\nLÍNGUA PORTUGUESA: 1. Crase. 2. Regência verbal e nominal.\n2.1 Regência de verbos de movimento."),
+                p(3, "ANEXO I\nLÍNGUA PORTUGUESA: 1. Crase. 2. Regência verbal e nominal.\n2.1 Regência de verbos de movimento.\nQUADRO DE PROVAS\nConhecimentos Gerais Língua Portuguesa 15 questões peso 1\nDuração: 4 horas e 30 minutos. Será eliminado o candidato que não obtiver 50% dos pontos."),
             ],
         )
         .unwrap();
@@ -361,8 +430,17 @@ mod tests {
         let cargo = analise_repo::cargos(&db.conn().unwrap(), "e1").unwrap()[0].clone();
         analise_repo::escolher_cargo(&db.conn().unwrap(), "e1", &cargo.id).unwrap();
 
-        let saida = json!({"materias": [{
+        let saida = json!({
+            "prova": {
+                "duracao_minutos": {"valor": 270, "trecho": "Duração: 4 horas e 30 minutos", "pagina": 3},
+                "minimo_geral": {"valor": 50, "trecho": "obtiver 60% dos pontos", "pagina": 3},
+                "blocos": [{"nome": "Conhecimentos Gerais", "questoes": null, "minimo": null,
+                            "trecho": "Conhecimentos Gerais", "pagina": 3}]
+            },
+            "materias": [{
             "nome": "Língua Portuguesa", "pagina": 3,
+            "quadro": {"bloco": "Conhecimentos Gerais", "questoes": 15, "peso": 1,
+                       "trecho": "Língua Portuguesa 15 questões peso 1", "pagina": 3},
             "topicos": [
                 {"texto": "Crase.", "pagina": 3, "subtopicos": []},
                 {"texto": "Regência verbal e nominal.", "pagina": 3, "subtopicos": [
@@ -374,7 +452,14 @@ mod tests {
         aplicar(&db, "e1", EtapaAnalise::Extrair, saida).unwrap();
 
         let a = analise_repo::carregar(&db.conn().unwrap(), "e1").unwrap();
+        let e = a.estrutura.unwrap();
+        assert_eq!((e.duracao_minutos, e.duracao_verificada), (Some(270), true));
+        // Trecho do mínimo não confere (o texto diz 50%): fica, marcado.
+        assert_eq!((e.minimo_geral, e.minimo_verificado), (Some(50.0), false));
+        assert!(e.blocos[0].verificado);
         let m = &a.materias.unwrap()[0];
+        assert_eq!((m.bloco.as_deref(), m.questoes, m.peso), (Some("Conhecimentos Gerais"), Some(15), Some(1.0)));
+        assert!(m.quadro_verificado);
         assert_eq!(m.topicos.len(), 3);
         assert!(m.topicos[0].verificado && m.topicos[0].inicio.is_some());
         assert!(m.topicos[1].filhos[0].verificado);
