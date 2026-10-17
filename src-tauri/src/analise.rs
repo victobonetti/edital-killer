@@ -399,9 +399,11 @@ mod tests {
         executar(&db, &paths, &backend, &p, &settings, CancelToken::default())
             .await
             .unwrap_or_else(|f| panic!("extrator: {:?}", f.erro));
-        let materias = carregar(&db, "e1").unwrap().materias.unwrap();
+        let a = carregar(&db, "e1").unwrap();
+        println!("estrutura: {:#?}", a.estrutura);
+        let materias = a.materias.unwrap();
         for m in &materias {
-            println!("{} (p. {:?})", m.nome, m.pagina);
+            println!("{} (p. {:?}) bloco {:?} q {:?} peso {:?} quadro ok {}", m.nome, m.pagina, m.bloco, m.questoes, m.peso, m.quadro_verificado);
             for t in &m.topicos {
                 println!("  {} {} p.{:?}", if t.verificado { "✓" } else { "?" }, t.texto, t.pagina);
             }
