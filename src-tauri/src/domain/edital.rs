@@ -48,6 +48,13 @@ pub struct Edital {
     pub status: EditalStatus,
     /// ISO 8601 (UTC).
     pub importado_em: String,
+    pub numero_edital: Option<String>,
+    /// Datas no formato `AAAA-MM-DD`, lidas do edital pela análise.
+    pub data_prova: Option<String>,
+    pub inscricoes_inicio: Option<String>,
+    pub inscricoes_fim: Option<String>,
+    /// O usuário editou o cabeçalho: a análise não sobrescreve mais esses campos.
+    pub metadados_editados: bool,
 }
 
 /// Trecho de texto da camada do pdf.js, com o índice onde começa no texto da página.
@@ -82,4 +89,7 @@ pub struct EditalUpdate {
     pub nome: String,
     pub orgao: Option<String>,
     pub banca: Option<String>,
+    pub numero_edital: Option<String>,
+    /// `AAAA-MM-DD`.
+    pub data_prova: Option<String>,
 }

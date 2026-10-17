@@ -2,6 +2,7 @@ use std::sync::RwLock;
 
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::analise::Fila;
 use crate::llm::backend::{BackendEstado, BackendStatus, LlmBackend};
 use crate::llm::claude_cli::ClaudeCliBackend;
 use crate::storage::{config_repo, AppPaths, Db};
@@ -15,6 +16,7 @@ pub struct AppState {
     pub claude: RwLock<BackendStatus>,
     /// Serializa health checks concorrentes.
     pub health_lock: tokio::sync::Mutex<()>,
+    pub fila: Fila,
 }
 
 impl AppState {
@@ -24,6 +26,7 @@ impl AppState {
             paths,
             claude: RwLock::new(BackendStatus::verificando()),
             health_lock: tokio::sync::Mutex::new(()),
+            fila: Fila::default(),
         }
     }
 
@@ -34,7 +37,7 @@ impl AppState {
             .unwrap_or_else(|_| BackendStatus::verificando())
     }
 
-    fn set_claude_status(&self, app: &AppHandle, st: BackendStatus) {
+    pub fn set_claude_status(&self, app: &AppHandle, st: BackendStatus) {
         if let Ok(mut g) = self.claude.write() {
             *g = st.clone();
         }
@@ -67,9 +70,14 @@ pub async fn rodar_health_check(app: &AppHandle) -> BackendStatus {
     .await;
 
     tracing::info!(estado = ?st.estado, versao = ?st.versao, erro = ?st.erro, "health check do claude");
+    let mut st = st;
     if st.estado == BackendEstado::Pronto {
         if let Err(e) = state.db.conn().and_then(|c| config_repo::marcar_health_passou(&c)) {
             tracing::warn!(erro = %e, "falha ao registrar health check aprovado");
+        }
+        // Um job pode ter começado durante a verificação.
+        if state.fila.executando() {
+            st.estado = BackendEstado::Ocupado;
         }
     }
     state.set_claude_status(app, st.clone());

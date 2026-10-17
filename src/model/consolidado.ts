@@ -1,19 +1,11 @@
 // Visão consolidada de um edital: o que a tela mostra ao usuário, sem jobs nem detalhes de processamento.
-// Junta o `Edital` (core) com o conteúdo extraído, quando houver. A extração (Item 4) ainda não existe;
-// quando chegar, `obterExtraido` passa a chamar o core e estes tipos viram bindings gerados.
+// Junta o `Edital` com a `Analise` (cargos, conteúdo e andamento) vindos do core.
+import type { Analise } from "../bindings/Analise";
+import type { Andamento } from "../bindings/Andamento";
+import type { Cargo } from "../bindings/Cargo";
 import type { Edital } from "../bindings/Edital";
-
-export type Topico = { id: string; texto: string; pagina: number | null; filhos: Topico[] };
-export type Materia = { id: string; nome: string; topicos: Topico[] };
-export type Cargo = { id: string; nome: string; vagas: number | null; escolaridade: string | null };
-
-export type Extraido = {
-  cargos: Cargo[];
-  /** Cargo que o usuário confirmou como o dele. */
-  cargo_escolhido: string | null;
-  /** Conteúdo programático do cargo escolhido. `null` = ainda não extraído. */
-  materias: Materia[] | null;
-};
+import type { Materia } from "../bindings/Materia";
+import type { Topico } from "../bindings/Topico";
 
 /** Em que ponto da jornada o edital está. Cada etapa tem um único próximo passo. */
 export type Etapa =
@@ -36,20 +28,26 @@ export const ETAPA_ROTULO: Record<Etapa, string> = {
 
 export type Consolidado = {
   etapa: Etapa;
+  /** Análise na fila ou executando agora. */
+  rodando: Andamento | null;
+  /** Última análise falhou ou foi interrompida (cancelamento pelo usuário não conta). */
+  falha: Andamento | null;
   cargos: Cargo[] | null;
   cargo: Cargo | null;
   materias: Materia[] | null;
   totalTopicos: number | null;
+  topicosConferir: number;
 };
 
-export function contarTopicos(ts: Topico[]): number {
-  return ts.reduce((n, t) => n + 1 + contarTopicos(t.filhos), 0);
+export function contarTopicos(ts: Topico[], filtro: (t: Topico) => boolean = () => true): number {
+  return ts.reduce((n, t) => n + (filtro(t) ? 1 : 0) + contarTopicos(t.filhos, filtro), 0);
 }
 
-export function consolidar(edital: Edital, ex: Extraido | null): Consolidado {
-  const cargos = ex?.cargos.length ? ex.cargos : null;
-  const cargo = cargos?.find((c) => c.id === ex?.cargo_escolhido) ?? null;
-  const materias = cargo ? (ex?.materias ?? null) : null;
+export function consolidar(edital: Edital, a: Analise | null): Consolidado {
+  const cargos = a?.cargos.length ? a.cargos : null;
+  const cargo = cargos?.find((c) => c.id === a?.cargo_escolhido) ?? null;
+  const materias = cargo ? (a?.materias ?? null) : null;
+  const and = a?.andamento ?? null;
   const etapa: Etapa =
     edital.status === "importando"
       ? "importando"
@@ -62,23 +60,15 @@ export function consolidar(edital: Edital, ex: Extraido | null): Consolidado {
             : !materias
               ? "extrair_conteudo"
               : "pronto";
+  const conferir = (t: Topico) => !t.verificado;
   return {
     etapa,
+    rodando: and && (and.status === "na_fila" || and.status === "executando") ? and : null,
+    falha: and && (and.status === "falhou" || and.status === "interrompido") ? and : null,
     cargos,
     cargo,
     materias,
     totalTopicos: materias ? materias.reduce((n, m) => n + contarTopicos(m.topicos), 0) : null,
+    topicosConferir: materias ? materias.reduce((n, m) => n + contarTopicos(m.topicos, conferir), 0) : 0,
   };
-}
-
-declare global {
-  interface Window {
-    /** Só em desenvolvimento no navegador: conteúdo de demonstração por edital (ver `dev/mockIpc.ts`). */
-    __ekDemoExtraido?: Record<string, Extraido>;
-  }
-}
-
-/** Conteúdo extraído do edital. Ainda não há extração no core: em produção devolve sempre `null`. */
-export async function obterExtraido(editalId: string): Promise<Extraido | null> {
-  return window.__ekDemoExtraido?.[editalId] ?? null;
 }

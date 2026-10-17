@@ -2,14 +2,27 @@
 // demonstração, para trabalhar o layout sem o app desktop. Nunca entra no build de produção.
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import type { Analise } from "../bindings/Analise";
 import type { BackendStatus } from "../bindings/BackendStatus";
+import type { Cargo } from "../bindings/Cargo";
 import type { Edital } from "../bindings/Edital";
+import type { EstruturaProva } from "../bindings/EstruturaProva";
+import type { EtapaAnalise } from "../bindings/EtapaAnalise";
 import type { Job } from "../bindings/Job";
+import type { Materia } from "../bindings/Materia";
 import type { Settings } from "../bindings/Settings";
-import type { Extraido, Topico } from "../model/consolidado";
+import type { Topico } from "../bindings/Topico";
 
 const agora = Date.now();
 const dia = 86_400_000;
+
+const semMetadados = {
+  numero_edital: null,
+  data_prova: null,
+  inscricoes_inicio: null,
+  inscricoes_fim: null,
+  metadados_editados: false,
+};
 
 const editais: Edital[] = [
   {
@@ -23,6 +36,11 @@ const editais: Edital[] = [
     paginas_sem_texto: [81, 82, 83],
     status: "importado",
     importado_em: new Date(agora - 2 * dia).toISOString(),
+    numero_edital: "01/2026",
+    data_prova: "2027-03-14",
+    inscricoes_inicio: "2026-11-03",
+    inscricoes_fim: "2026-12-04",
+    metadados_editados: false,
   },
   {
     id: "demo-novo",
@@ -35,6 +53,7 @@ const editais: Edital[] = [
     paginas_sem_texto: [],
     status: "importado",
     importado_em: new Date(agora - 3600_000).toISOString(),
+    ...semMetadados,
   },
   {
     id: "demo-interrompido",
@@ -47,6 +66,7 @@ const editais: Edital[] = [
     paginas_sem_texto: [],
     status: "importando",
     importado_em: new Date(agora - 5 * dia).toISOString(),
+    ...semMetadados,
   },
   {
     id: "demo-escaneado",
@@ -59,29 +79,53 @@ const editais: Edital[] = [
     paginas_sem_texto: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     status: "sem_texto",
     importado_em: new Date(agora - 9 * dia).toISOString(),
+    ...semMetadados,
   },
 ];
 
 let n = 0;
-const t = (texto: string, pagina: number | null, filhos: Topico[] = []): Topico => ({
+const t = (texto: string, pagina: number | null, filhos: Topico[] = [], verificado = true): Topico => ({
   id: `t${n++}`,
   texto,
   pagina,
+  verificado,
+  inicio: null,
+  fim: null,
   filhos,
 });
 
-const extraido: Record<string, Extraido> = {
+const cargosDemo: Cargo[] = [
+  { id: "c1", nome: "Auditor de Controle Externo — Tecnologia da Informação", vagas: 12, escolaridade: "Superior", pagina: 3, verificado: true },
+  { id: "c2", nome: "Auditor de Controle Externo — Contabilidade", vagas: 20, escolaridade: "Superior", pagina: 3, verificado: true },
+  { id: "c3", nome: "Agente da Fiscalização", vagas: 35, escolaridade: "Superior", pagina: 4, verificado: true },
+];
+
+const estruturaDemo: EstruturaProva = {
+  duracao_minutos: 270,
+  duracao_verificada: true,
+  minimo_geral: 60,
+  minimo_verificado: true,
+  blocos: [
+    { nome: "Conhecimentos Gerais", questoes: 30, minimo: 50, verificado: true },
+    { nome: "Conhecimentos Específicos", questoes: null, minimo: 50, verificado: true },
+  ],
+};
+
+const analises: Record<string, Analise> = {
   "demo-completo": {
-    cargos: [
-      { id: "c1", nome: "Auditor de Controle Externo — Tecnologia da Informação", vagas: 12, escolaridade: "Superior" },
-      { id: "c2", nome: "Auditor de Controle Externo — Contabilidade", vagas: 20, escolaridade: "Superior" },
-      { id: "c3", nome: "Agente da Fiscalização", vagas: 35, escolaridade: "Superior" },
-    ],
+    andamento: null,
+    cargos: cargosDemo,
     cargo_escolhido: "c1",
+    estrutura: estruturaDemo,
     materias: [
       {
         id: "m1",
         nome: "Língua Portuguesa",
+        bloco: "Conhecimentos Gerais",
+        questoes: null,
+        peso: 1,
+        quadro_verificado: true,
+        pagina: 41,
         topicos: [
           t("Leitura e interpretação de textos", 41, [t("Sentido próprio e figurado", 41), t("Coesão e coerência", 41)]),
           t("Pontuação", 41),
@@ -94,6 +138,11 @@ const extraido: Record<string, Extraido> = {
       {
         id: "m2",
         nome: "Governança e Gestão de TI",
+        bloco: "Conhecimentos Específicos",
+        questoes: 12,
+        peso: 2,
+        quadro_verificado: true,
+        pagina: 44,
         topicos: [
           t("ITIL 4: práticas e cadeia de valor de serviço", 44),
           t("COBIT 2019", 44),
@@ -104,6 +153,11 @@ const extraido: Record<string, Extraido> = {
       {
         id: "m3",
         nome: "Engenharia de Software",
+        bloco: "Conhecimentos Específicos",
+        questoes: 14,
+        peso: 2,
+        quadro_verificado: true,
+        pagina: 45,
         topicos: [
           t("Princípios SOLID", 45),
           t("Modelagem de processos com BPMN", 45),
@@ -114,21 +168,36 @@ const extraido: Record<string, Extraido> = {
       {
         id: "m4",
         nome: "Banco de Dados",
+        bloco: "Conhecimentos Específicos",
+        questoes: 8,
+        peso: 2,
+        quadro_verificado: true,
+        pagina: 46,
         topicos: [t("Modelo relacional e normalização", 46), t("Transações e propriedades ACID", 47), t("SQL", 47)],
       },
       {
         id: "m5",
         nome: "Segurança da Informação",
+        bloco: "Conhecimentos Específicos",
+        questoes: 8,
+        peso: 2,
+        quadro_verificado: true,
+        pagina: 47,
         topicos: [t("ISO/IEC 27001 e 27002", 47), t("LGPD", 47), t("Criptografia e certificação digital", 48)],
       },
       {
         id: "m6",
         nome: "Legislação",
+        bloco: "Conhecimentos Gerais",
+        questoes: null,
+        peso: 1,
+        quadro_verificado: false,
+        pagina: 48,
         topicos: [
           t("Lei nº 14.133/2021 (licitações e contratos)", 48),
           t("Lei nº 13.303/2016", 48),
           t("Lei de Acesso à Informação", 49),
-          t("LC nº 182/2021 (marco das startups)", 49),
+          t("LC nº 182/2021 (marco das startups)", 49, [], false),
         ],
       },
     ],
@@ -197,9 +266,30 @@ function pdfDemo(): ArrayBuffer {
   return new TextEncoder().encode(out).buffer as ArrayBuffer;
 }
 
+const materiasDemo: Materia[] = analises["demo-completo"].materias!;
+
+/** Simula o worker: o job fica "executando" por alguns segundos e então grava o resultado. */
+function simular(editalId: string, etapa: EtapaAnalise, aplicar: (a: Analise) => void) {
+  const a = (analises[editalId] ??= { cargos: [], cargo_escolhido: null, materias: null, estrutura: null, andamento: null });
+  a.andamento = { etapa, status: "executando", desde: new Date().toISOString(), erro: null };
+  void emit("claude-status", { ...pronto, estado: "ocupado" });
+  const fim = setTimeout(() => {
+    aplicar(a);
+    a.andamento = { ...a.andamento!, status: "concluido" };
+    void emit("claude-status", pronto);
+    void emit("analise-atualizada", editalId);
+  }, 4000);
+  cancelamentos[editalId] = () => {
+    clearTimeout(fim);
+    a.andamento = { ...a.andamento!, status: "cancelado" };
+    void emit("claude-status", pronto);
+    void emit("analise-atualizada", editalId);
+  };
+}
+const cancelamentos: Record<string, () => void> = {};
+
 export function instalarMockIpc() {
   mockWindows("main");
-  window.__ekDemoExtraido = extraido;
   mockIPC(
     (cmd, args) => {
       const a = (args ?? {}) as Record<string, unknown>;
@@ -222,7 +312,7 @@ export function instalarMockIpc() {
           return porId() ?? Promise.reject({ code: "EDITAL_NOT_FOUND", detail: String(a.id) });
         case "edital_atualizar": {
           const e = porId()!;
-          Object.assign(e, a.dados);
+          Object.assign(e, a.dados, { metadados_editados: true });
           return e;
         }
         case "edital_remover":
@@ -232,6 +322,41 @@ export function instalarMockIpc() {
           return pdfDemo();
         case "jobs_listar":
           return jobs;
+        case "edital_analise":
+          return analises[a.editalId as string] ?? { cargos: [], cargo_escolhido: null, materias: null, estrutura: null, andamento: null };
+        case "analise_iniciar": {
+          const id = a.editalId as string;
+          simular(id, "localizar", (an) => {
+            an.cargos = cargosDemo;
+            an.cargo_escolhido = null;
+            an.materias = null;
+            an.estrutura = null;
+            const e = editais.find((x) => x.id === id)!;
+            if (!e.metadados_editados) {
+              Object.assign(e, {
+                nome: "Concurso Público nº 03/2026 — Prefeitura (exemplo)",
+                orgao: "Prefeitura Municipal (exemplo)",
+                banca: "Banca Exemplo",
+                numero_edital: "03/2026",
+                data_prova: "2027-02-07",
+              });
+            }
+          });
+          return null;
+        }
+        case "cargo_escolher": {
+          const id = a.editalId as string;
+          analises[id].cargo_escolhido = a.cargoId as string;
+          analises[id].materias = null;
+          simular(id, "extrair", (an) => {
+            an.materias = materiasDemo;
+            an.estrutura = estruturaDemo;
+          });
+          return null;
+        }
+        case "analise_cancelar":
+          cancelamentos[a.editalId as string]?.();
+          return null;
         case "limpar_workspaces_jobs":
           return 2;
         case "escolher_pdfs":

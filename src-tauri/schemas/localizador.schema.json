@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadados", "cargos"],
+  "properties": {
+    "metadados": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["titulo", "orgao", "banca", "numero_edital", "data_prova", "inscricoes_inicio", "inscricoes_fim"],
+      "properties": {
+        "titulo": { "$ref": "#/$defs/campo" },
+        "orgao": { "$ref": "#/$defs/campo" },
+        "banca": { "$ref": "#/$defs/campo" },
+        "numero_edital": { "$ref": "#/$defs/campo" },
+        "data_prova": { "$ref": "#/$defs/campo" },
+        "inscricoes_inicio": { "$ref": "#/$defs/campo" },
+        "inscricoes_fim": { "$ref": "#/$defs/campo" }
+      }
+    },
+    "cargos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nome", "vagas", "escolaridade", "pagina"],
+        "properties": {
+          "nome": { "type": "string", "minLength": 1 },
+          "vagas": { "type": ["integer", "null"], "minimum": 0 },
+          "escolaridade": { "type": ["string", "null"] },
+          "pagina": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "campo": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["valor", "trecho", "pagina"],
+      "properties": {
+        "valor": { "type": "string", "minLength": 1 },
+        "trecho": { "type": "string", "minLength": 1 },
+        "pagina": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

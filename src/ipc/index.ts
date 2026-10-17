@@ -1,6 +1,7 @@
 // Wrappers tipados dos commands do core. Toda chamada IPC passa por aqui.
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Analise } from "../bindings/Analise";
 import type { AppError } from "../bindings/AppError";
 import type { BackendStatus } from "../bindings/BackendStatus";
 import type { Bootstrap } from "../bindings/Bootstrap";
@@ -59,8 +60,18 @@ export const ipc = {
     call<void>("importar_abortar", { id, code }),
 
   jobsListar: () => call<Job[]>("jobs_listar"),
+
+  editalAnalise: (editalId: string) => call<Analise>("edital_analise", { editalId }),
+  analiseIniciar: (editalId: string) => call<void>("analise_iniciar", { editalId }),
+  cargoEscolher: (editalId: string, cargoId: string) => call<void>("cargo_escolher", { editalId, cargoId }),
+  analiseCancelar: (editalId: string) => call<void>("analise_cancelar", { editalId }),
 };
 
 export function onClaudeStatus(cb: (s: BackendStatus) => void): Promise<UnlistenFn> {
   return listen<BackendStatus>("claude-status", (ev) => cb(ev.payload));
+}
+
+/** A análise de um edital mudou (começou, terminou, falhou). Payload: id do edital. */
+export function onAnalise(cb: (editalId: string) => void): Promise<UnlistenFn> {
+  return listen<string>("analise-atualizada", (ev) => cb(ev.payload));
 }

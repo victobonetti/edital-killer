@@ -1,8 +1,12 @@
+use std::path::PathBuf;
+use std::time::Duration;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::error::AppError;
+use crate::llm::cancel::CancelToken;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -54,10 +58,30 @@ impl BackendStatus {
     }
 }
 
+/// Uma chamada ao LLM: prompt, schema da saída e onde trabalhar.
+#[derive(Debug, Clone)]
+pub struct Execucao {
+    /// Pasta do job; o LLM só lê arquivos daqui.
+    pub workspace: PathBuf,
+    pub prompt: String,
+    /// JSON Schema (texto) que a saída precisa seguir.
+    pub schema: String,
+    pub modelo: Option<String>,
+    pub timeout: Duration,
+}
+
+#[derive(Debug, Clone)]
+pub struct FalhaJob {
+    pub erro: AppError,
+    /// Fim do limite de uso, quando conhecido (ISO 8601).
+    pub retorno_em: Option<String>,
+}
+
 /// Backend de LLM usado pelo core. No Passo 1 a única implementação é
 /// `ClaudeCliBackend`; o adaptador BYOK (API key) entra depois por esta interface.
-/// A execução de jobs entra aqui junto com o runner (Item 3).
 #[async_trait]
 pub trait LlmBackend: Send + Sync {
     async fn health_check(&self) -> BackendStatus;
+    /// Executa um job e devolve a saída estruturada (ainda não validada pelo core).
+    async fn executar(&self, ex: Execucao, cancel: CancelToken) -> Result<serde_json::Value, FalhaJob>;
 }

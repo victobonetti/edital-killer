@@ -1,0 +1,91 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["prova", "materias"],
+  "properties": {
+    "prova": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duracao_minutos", "minimo_geral", "blocos"],
+      "properties": {
+        "duracao_minutos": { "$ref": "#/$defs/numero" },
+        "minimo_geral": { "$ref": "#/$defs/numero" },
+        "blocos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["nome", "questoes", "minimo", "trecho", "pagina"],
+            "properties": {
+              "nome": { "type": "string", "minLength": 1 },
+              "questoes": { "type": ["integer", "null"], "minimum": 1 },
+              "minimo": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+              "trecho": { "type": "string", "minLength": 1 },
+              "pagina": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "materias": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nome", "pagina", "quadro", "topicos"],
+        "properties": {
+          "nome": { "type": "string", "minLength": 1 },
+          "pagina": { "type": "integer", "minimum": 1 },
+          "quadro": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["bloco", "questoes", "peso", "trecho", "pagina"],
+            "properties": {
+              "bloco": { "type": ["string", "null"] },
+              "questoes": { "type": ["integer", "null"], "minimum": 1 },
+              "peso": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+              "trecho": { "type": ["string", "null"] },
+              "pagina": { "type": ["integer", "null"], "minimum": 1 }
+            }
+          },
+          "topicos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["texto", "pagina", "subtopicos"],
+              "properties": {
+                "texto": { "type": "string", "minLength": 1 },
+                "pagina": { "type": "integer", "minimum": 1 },
+                "subtopicos": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["texto", "pagina"],
+                    "properties": {
+                      "texto": { "type": "string", "minLength": 1 },
+                      "pagina": { "type": "integer", "minimum": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "numero": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["valor", "trecho", "pagina"],
+      "properties": {
+        "valor": { "type": "number", "minimum": 0 },
+        "trecho": { "type": "string", "minLength": 1 },
+        "pagina": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

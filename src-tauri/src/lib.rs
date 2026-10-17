@@ -1,12 +1,17 @@
+mod analise;
 mod commands;
 mod domain;
 mod error;
+mod extraction;
 mod importacao;
 mod llm;
 mod state;
 mod storage;
+#[cfg(test)]
+mod test_support;
 
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tracing_subscriber::EnvFilter;
 
 use crate::state::{rodar_health_check, AppState};
@@ -51,6 +56,7 @@ pub fn run() {
                 tracing::warn!(orfaos, "jobs interrompidos pelo fechamento anterior");
             }
             app.manage(AppState::new(db, paths));
+            analise::iniciar_worker(app.handle());
 
             // 3. Health check em segundo plano; a UI abre com o indicador em "verificando".
             let handle = app.handle().clone();
@@ -59,7 +65,12 @@ pub fn run() {
             });
             Ok(())
         })
+        .on_window_event(confirmar_fechamento)
         .invoke_handler(tauri::generate_handler![
+            commands::analise::analise_iniciar,
+            commands::analise::cargo_escolher,
+            commands::analise::analise_cancelar,
+            commands::analise::edital_analise,
             commands::app::app_bootstrap,
             commands::app::settings_obter,
             commands::app::settings_salvar,
@@ -83,4 +94,37 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Fechar com análise em andamento pergunta antes; confirmando, o `claude` é morto
+/// (cancelamento + `kill_on_drop`) e o app sai. Nenhum processo filho sobrevive.
+fn confirmar_fechamento(window: &tauri::Window, event: &WindowEvent) {
+    let WindowEvent::CloseRequested { api, .. } = event else {
+        return;
+    };
+    let app = window.app_handle().clone();
+    if !app.state::<AppState>().fila.executando() {
+        return;
+    }
+    api.prevent_close();
+    app.dialog()
+        .message("Uma análise de edital está em andamento. Se fechar agora, ela será cancelada e você poderá começar de novo depois.")
+        .title("Fechar o Edital Killer?")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Cancelar análise e fechar".into(),
+            "Continuar".into(),
+        ))
+        .show(move |fechar| {
+            if !fechar {
+                return;
+            }
+            app.state::<AppState>().fila.cancelar_atual(None);
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                // Dá tempo de o worker matar o processo e registrar o cancelamento.
+                tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                app.exit(0);
+            });
+        });
 }
