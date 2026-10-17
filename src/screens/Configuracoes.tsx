@@ -142,9 +142,10 @@ function Avancado({
             Modelo
             <input
               value={s.model ?? ""}
-              placeholder="Padrão do Claude Code"
+              placeholder="sonnet (padrão)"
               onChange={(e) => setS({ ...s, model: e.target.value || null })}
             />
+            <small className="mudo">Usado nas análises de edital. Aceita apelidos como sonnet ou opus.</small>
           </label>
           <label>
             Tempo limite por análise (segundos)

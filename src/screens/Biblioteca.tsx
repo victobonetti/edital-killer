@@ -5,8 +5,8 @@ import type { Edital } from "../bindings/Edital";
 import { ErrorBox } from "../components/ErrorBox";
 import { Icone } from "../components/Icone";
 import { importarArquivo, retomarImportacao, type Progresso } from "../import/importar";
-import { ipc, toAppError } from "../ipc";
-import { consolidar, ETAPA_ROTULO, obterExtraido, type Consolidado } from "../model/consolidado";
+import { ipc, onAnalise, toAppError } from "../ipc";
+import { consolidar, ETAPA_ROTULO, type Consolidado } from "../model/consolidado";
 import { plural, quando } from "../model/formato";
 
 type EmAndamento = { arquivo: string; progresso: Progresso | null };
@@ -28,12 +28,24 @@ export function Biblioteca({ onAbrir }: { onAbrir: (id: string, aviso?: string) 
     ipc.editaisListar().then(
       async (editais) =>
         setItens(
-          await Promise.all(editais.map(async (e) => ({ edital: e, visao: consolidar(e, await obterExtraido(e.id)) }))),
+          await Promise.all(
+            editais.map(async (e) => ({
+              edital: e,
+              visao: consolidar(e, await ipc.editalAnalise(e.id).catch(() => null)),
+            })),
+          ),
         ),
       (e) => setErroLista(toAppError(e)),
     );
   }, []);
-  useEffect(carregar, [carregar]);
+  useEffect(() => {
+    carregar();
+    // Análises terminam em segundo plano: o selo do cartão acompanha.
+    const desliga = onAnalise(carregar);
+    return () => {
+      void desliga.then((f) => f());
+    };
+  }, [carregar]);
 
   const importar = useCallback(
     async (caminhos: string[]) => {
@@ -181,7 +193,11 @@ export function Biblioteca({ onAbrir }: { onAbrir: (id: string, aviso?: string) 
                 <h2 className="cartao-nome">{it.edital.nome}</h2>
                 {it.visao.cargo && <p className="cartao-cargo">{it.visao.cargo.nome}</p>}
                 <div className="cartao-pe">
-                  <span className={`selo ${it.visao.etapa}`}>{ETAPA_ROTULO[it.visao.etapa]}</span>
+                  {it.visao.rodando ? (
+                    <span className="selo analisando">Analisando…</span>
+                  ) : (
+                    <span className={`selo ${it.visao.etapa}`}>{ETAPA_ROTULO[it.visao.etapa]}</span>
+                  )}
                   <span className="mudo">
                     {it.visao.materias
                       ? plural(it.visao.materias.length, "matéria", "matérias")

@@ -315,6 +315,36 @@ input:focus { outline: none; border-color: var(--tinta-2); box-shadow: 0 0 0 3px
 .proximo-texto { margin-top: 10px; max-width: 64ch; color: var(--tinta-2); font-size: 15px; }
 .proximo .acoes .mudo { font-size: 13px; }
 
+.proximo.rodando::before { background: linear-gradient(var(--carimbo), var(--aviso)); }
+.progresso-indeterminado { height: 3px; background: var(--folha-2); margin-top: 20px; overflow: hidden; border-radius: 2px; }
+.progresso-indeterminado span { display: block; width: 30%; height: 100%; background: var(--carimbo); animation: vaivem 1.6s ease-in-out infinite; }
+@keyframes vaivem { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+.proximo .erro { margin: 16px 0 0; }
+.proximo .nota { margin: 16px 0 0; }
+
+.escolha-cargos { border: none; padding: 0; margin: 18px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.escolha-cargos label {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: baseline; cursor: pointer;
+  padding: 12px 14px; border: 1px solid var(--fio); border-radius: 4px; background: var(--papel); transition: border-color .15s, background .15s;
+}
+.escolha-cargos label:hover { border-color: var(--tinta-2); }
+.escolha-cargos label.marcado { border-color: var(--carimbo); background: var(--carimbo-suave); }
+.escolha-cargos input { width: auto; accent-color: var(--carimbo); transform: translateY(2px); }
+.escolha-cargos .mudo { font-size: 12.5px; white-space: nowrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.fatos { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; color: var(--tinta-2); font-size: 13.5px; }
+.fatos li { position: relative; }
+.fatos li + li::before { content: "·"; position: absolute; left: -13px; color: var(--mudo); }
+
+.topico-ref { display: inline-flex; align-items: baseline; gap: 6px; flex: none; }
+.conferir {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--aviso);
+  border: 1px solid color-mix(in srgb, var(--aviso) 50%, transparent); border-radius: 3px; padding: 0 5px;
+}
+.selo.analisando { color: var(--carimbo); animation: pulsar 1.6s infinite; }
+.sobre .acoes { margin-top: 0; }
+
 /* Números do edital. */
 .numeros { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border-top: 1px solid var(--fio-forte); border-bottom: 1px solid var(--fio); }
 .numeros > div { padding: 16px 20px 18px; border-left: 1px solid var(--fio); }

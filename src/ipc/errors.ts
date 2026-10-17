@@ -69,4 +69,38 @@ export const CATALOGO: Record<ErrorCode, ErroExplicado> = {
     explicacao: "O Claude Code demorou demais para responder.",
     acao: "Verifique sua conexão e tente de novo.",
   },
+  CLAUDE_EXEC_FAILED: {
+    titulo: "O Claude não conseguiu terminar",
+    explicacao: "A análise parou no meio por um erro do Claude ou da conexão.",
+    acao: "Tente de novo em alguns minutos. Se repetir, abra os logs em Ajustes › Avançado.",
+  },
+  CLAUDE_USAGE_LIMIT: {
+    titulo: "Limite de uso do Claude atingido",
+    explicacao: "Sua conta do Claude chegou ao limite de uso por agora. Nada foi perdido.",
+    acao: "Espere o limite renovar e tente de novo.",
+  },
+  CLAUDE_MODEL_UNAVAILABLE: {
+    titulo: "Modelo indisponível na sua conta",
+    explicacao: "O modelo configurado para a análise não está liberado no seu plano do Claude.",
+    acao: "Em Ajustes › Avançado, deixe o modelo em branco (usa o padrão) ou escolha outro.",
+  },
+  CLAUDE_OUTPUT_INVALID: {
+    titulo: "Resposta incompleta",
+    explicacao: "O Claude respondeu, mas a resposta não veio no formato esperado. Nada do que já existia foi alterado.",
+    acao: "Tente de novo; costuma funcionar na segunda vez.",
+  },
+  JOB_CANCELLED: {
+    titulo: "Análise cancelada",
+    explicacao: "A análise foi interrompida a pedido.",
+  },
+  ANALISE_EM_ANDAMENTO: {
+    titulo: "Análise em andamento",
+    explicacao: "Este edital já está sendo analisado.",
+    acao: "Espere terminar ou cancele a análise atual.",
+  },
+  CARGOS_NAO_ENCONTRADOS: {
+    titulo: "Nenhum cargo encontrado",
+    explicacao: "O Claude leu o edital, mas não encontrou um quadro de cargos.",
+    acao: "Confira se este PDF é o edital de abertura (e não uma retificação ou um anexo) e tente de novo.",
+  },
 };
