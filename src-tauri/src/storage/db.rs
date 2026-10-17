@@ -7,7 +7,10 @@ use crate::error::{AppError, AppResult, ErrorCode};
 
 /// Migrações versionadas, aplicadas em ordem. A versão atual fica em `PRAGMA user_version`.
 /// Nunca edite uma migração já publicada: acrescente outra.
-const MIGRATIONS: &[&str] = &[include_str!("migrations/001_inicial.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/001_inicial.sql"),
+    include_str!("migrations/002_extracao.sql"),
+];
 
 pub struct Db {
     conn: Mutex<Connection>,

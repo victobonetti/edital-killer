@@ -4,8 +4,8 @@ use crate::domain::normalize::normalizar;
 use crate::domain::{Edital, EditalStatus, EditalUpdate, PaginaInput};
 use crate::error::{AppError, AppResult, ErrorCode};
 
-const COLS: &str =
-    "id, nome, orgao, banca, arquivo_original, sha256, total_paginas, status, importado_em";
+const COLS: &str = "id, nome, orgao, banca, arquivo_original, sha256, total_paginas, status, importado_em,
+     numero_edital, data_prova, inscricoes_inicio, inscricoes_fim, metadados_editados";
 
 pub struct NovoEdital<'a> {
     pub id: &'a str,
@@ -71,14 +71,58 @@ pub fn atualizar(conn: &Connection, id: &str, u: &EditalUpdate) -> AppResult<Edi
             .filter(|s| !s.is_empty())
             .map(str::to_owned)
     };
+    let data_prova = limpa(&u.data_prova);
+    if data_prova.as_deref().is_some_and(|d| !data_valida(d)) {
+        return Err(AppError::new(ErrorCode::InvalidInput, "data da prova deve ser AAAA-MM-DD"));
+    }
     let n = conn.execute(
-        "UPDATE edital SET nome = ?2, orgao = ?3, banca = ?4 WHERE id = ?1",
-        params![id, nome, limpa(&u.orgao), limpa(&u.banca)],
+        "UPDATE edital SET nome = ?2, orgao = ?3, banca = ?4, numero_edital = ?5, data_prova = ?6,
+         metadados_editados = 1 WHERE id = ?1",
+        params![id, nome, limpa(&u.orgao), limpa(&u.banca), limpa(&u.numero_edital), data_prova],
     )?;
     if n == 0 {
         return Err(AppError::new(ErrorCode::EditalNotFound, format!("edital {id}")));
     }
     get(conn, id)
+}
+
+/// Metadados lidos do edital pela análise. Campos `None` não mudam.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MetadadosLidos {
+    pub nome: Option<String>,
+    pub orgao: Option<String>,
+    pub banca: Option<String>,
+    pub numero_edital: Option<String>,
+    pub data_prova: Option<String>,
+    pub inscricoes_inicio: Option<String>,
+    pub inscricoes_fim: Option<String>,
+}
+
+/// Aplica os metadados da análise, a menos que o usuário já tenha editado o cabeçalho.
+pub fn aplicar_metadados(conn: &Connection, id: &str, m: &MetadadosLidos) -> AppResult<bool> {
+    let n = conn.execute(
+        "UPDATE edital SET
+            nome = COALESCE(?2, nome), orgao = COALESCE(?3, orgao), banca = COALESCE(?4, banca),
+            numero_edital = COALESCE(?5, numero_edital), data_prova = COALESCE(?6, data_prova),
+            inscricoes_inicio = COALESCE(?7, inscricoes_inicio), inscricoes_fim = COALESCE(?8, inscricoes_fim)
+         WHERE id = ?1 AND metadados_editados = 0",
+        params![
+            id,
+            m.nome,
+            m.orgao,
+            m.banca,
+            m.numero_edital,
+            m.data_prova,
+            m.inscricoes_inicio,
+            m.inscricoes_fim
+        ],
+    )?;
+    Ok(n > 0)
+}
+
+/// `AAAA-MM-DD` com mês e dia plausíveis.
+pub fn data_valida(s: &str) -> bool {
+    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok()
 }
 
 pub fn remover(conn: &Connection, id: &str) -> AppResult<()> {
@@ -171,6 +215,11 @@ fn from_row(r: &Row) -> rusqlite::Result<Edital> {
         paginas_sem_texto: Vec::new(),
         status: EditalStatus::parse(&status).unwrap_or(EditalStatus::Importando),
         importado_em: r.get(8)?,
+        numero_edital: r.get(9)?,
+        data_prova: r.get(10)?,
+        inscricoes_inicio: r.get(11)?,
+        inscricoes_fim: r.get(12)?,
+        metadados_editados: r.get(13)?,
     })
 }
 
@@ -263,11 +312,47 @@ mod tests {
                 nome: " TCE-SP 2026 ".into(),
                 orgao: Some("TCE-SP".into()),
                 banca: Some("  ".into()),
+                numero_edital: None,
+                data_prova: Some("2027-03-14".into()),
             },
         )
         .unwrap();
         assert_eq!(e.nome, "TCE-SP 2026");
         assert_eq!(e.orgao.as_deref(), Some("TCE-SP"));
         assert_eq!(e.banca, None);
+        assert_eq!(e.data_prova.as_deref(), Some("2027-03-14"));
+        assert!(e.metadados_editados);
+    }
+
+    #[test]
+    fn analise_preenche_metadados_so_sem_edicao() {
+        let db = Db::open_in_memory().unwrap();
+        let conn = db.conn().unwrap();
+        novo(&conn, "e1");
+        let lidos = MetadadosLidos {
+            nome: Some("Concurso Público nº 1/2026".into()),
+            banca: Some("VUNESP".into()),
+            ..Default::default()
+        };
+        assert!(aplicar_metadados(&conn, "e1", &lidos).unwrap());
+        let e = get(&conn, "e1").unwrap();
+        assert_eq!(e.nome, "Concurso Público nº 1/2026");
+        assert_eq!(e.banca.as_deref(), Some("VUNESP"));
+        assert_eq!(e.orgao, None);
+
+        atualizar(
+            &conn,
+            "e1",
+            &EditalUpdate {
+                nome: "Meu nome".into(),
+                orgao: None,
+                banca: None,
+                numero_edital: None,
+                data_prova: None,
+            },
+        )
+        .unwrap();
+        assert!(!aplicar_metadados(&conn, "e1", &lidos).unwrap());
+        assert_eq!(get(&conn, "e1").unwrap().nome, "Meu nome");
     }
 }

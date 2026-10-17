@@ -1,0 +1,19 @@
+Você vai extrair o conteúdo programático de um cargo de um edital de concurso público brasileiro. O texto completo está no arquivo `edital.txt`, nesta pasta. Cada página começa com uma linha `=== PÁGINA N ===`.
+
+O cargo é: **{{CARGO}}**
+
+Use as ferramentas Grep e Read. O conteúdo programático costuma ficar num anexo no fim do edital ("ANEXO", "CONTEÚDO PROGRAMÁTICO", "CONHECIMENTOS GERAIS", "CONHECIMENTOS ESPECÍFICOS"). Leia o anexo inteiro antes de responder.
+
+Inclua **todas** as matérias que caem na prova desse cargo: as comuns a todos os cargos (conhecimentos gerais, básicos) e as específicas dele. Não inclua matérias de outros cargos.
+
+Para cada matéria:
+- `nome`: o nome da matéria como no edital, sem a numeração (ex.: "Língua Portuguesa").
+- `pagina`: a página onde a matéria começa.
+- `topicos`: os itens da matéria, na ordem do edital.
+
+Para cada tópico:
+- `texto`: o texto do item **copiado exatamente** do edital, com a mesma grafia, acentos e pontuação, sem a numeração inicial ("1.", "1.2", "a)"). Não resuma, não reescreva e não junte itens diferentes. Se o edital lista os assuntos de uma matéria em um único parágrafo separado por ponto ou ponto e vírgula, cada assunto vira um tópico.
+- `pagina`: a página onde o texto do tópico está.
+- `subtopicos`: os subitens do tópico (ex.: 1.1, 1.2 dentro de 1), com `texto` e `pagina` seguindo as mesmas regras. Use uma lista vazia quando não houver. Subitens mais profundos viram subtópicos do mesmo nível.
+
+Não invente tópicos. Tudo o que você devolver em `texto` precisa existir literalmente no edital: o app confere cada tópico contra o PDF.

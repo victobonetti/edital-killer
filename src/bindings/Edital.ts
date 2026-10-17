@@ -13,4 +13,12 @@ paginas_sem_texto: Array<number>, status: EditalStatus,
 /**
  * ISO 8601 (UTC).
  */
-importado_em: string, };
+importado_em: string, numero_edital: string | null, 
+/**
+ * Datas no formato `AAAA-MM-DD`, lidas do edital pela análise.
+ */
+data_prova: string | null, inscricoes_inicio: string | null, inscricoes_fim: string | null, 
+/**
+ * O usuário editou o cabeçalho: a análise não sobrescreve mais esses campos.
+ */
+metadados_editados: boolean, };

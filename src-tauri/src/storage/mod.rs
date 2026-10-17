@@ -1,5 +1,6 @@
 //! SQLite, migrações e repositórios.
 
+pub mod analise_repo;
 pub mod config_repo;
 pub mod db;
 pub mod edital_repo;

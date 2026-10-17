@@ -1,0 +1,27 @@
+Você vai ler um edital de concurso público brasileiro e extrair dados dele. O texto completo está no arquivo `edital.txt`, nesta pasta. Cada página começa com uma linha `=== PÁGINA N ===`. Páginas marcadas `[sem texto]` eram imagens e não podem ser lidas.
+
+Use as ferramentas Grep e Read para ler o arquivo. Ele pode ser longo: leia em partes e use Grep para achar seções como "CARGOS", "VAGAS", "QUADRO", "CRONOGRAMA", "INSCRIÇÕES" e "PROVA". Não invente nada. Se uma informação não estiver no edital, devolva `null`.
+
+## 1. Metadados do edital
+
+Para cada campo, devolva `valor`, `trecho` e `pagina`, ou `null` se o edital não informar:
+
+- `titulo`: um título curto e claro para o usuário reconhecer o edital, como o edital se identifica. Exemplo: "Concurso Público nº 01/2026 — Tribunal de Contas do Estado". Use até 90 caracteres.
+- `orgao`: o órgão ou entidade que realiza o concurso, por extenso, como aparece no edital.
+- `banca`: a organizadora do concurso (ex.: VUNESP, FGV, Cebraspe, FCC). Use a sigla mais conhecida.
+- `numero_edital`: o número do edital, como "01/2026".
+- `data_prova`: a data da prova objetiva, em `AAAA-MM-DD`. Se houver mais de uma data, use a primeira.
+- `inscricoes_inicio` e `inscricoes_fim`: o período de inscrições, em `AAAA-MM-DD`.
+
+O `trecho` é a prova de onde o valor veio. Ele precisa ser uma **cópia exata** de um pedaço curto do edital (de 3 a 15 palavras) que contenha a informação, com a mesma grafia, inclusive acentos. Exemplo de trecho para `data_prova`: "A prova objetiva será realizada em 14 de março de 2027". A `pagina` é a página onde esse trecho está.
+
+## 2. Cargos
+
+Liste **todos** os cargos (ou cargos/especialidades, ou cargos/áreas) oferecidos no edital, na ordem em que aparecem. Para cada um:
+
+- `nome`: o nome do cargo **copiado exatamente** como está no edital. Quando houver especialidade ou área, inclua-a no nome como no edital (ex.: "Auditor de Controle Externo – Tecnologia da Informação").
+- `vagas`: o total de vagas do cargo (ampla concorrência + reservas), ou `null` se o edital não informar. Cadastro reserva sem número = `0`.
+- `escolaridade`: o nível exigido, de forma curta: "Superior", "Médio", "Técnico" ou "Fundamental". Use `null` se não houver.
+- `pagina`: a página onde o nome do cargo aparece pela primeira vez no quadro de cargos.
+
+Não repita o mesmo cargo. Não liste como cargo as matérias, os blocos de prova nem as localidades.
