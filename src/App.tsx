@@ -3,11 +3,9 @@ import "./App.css";
 import type { AppError } from "./bindings/AppError";
 import type { BackendStatus } from "./bindings/BackendStatus";
 import type { Bootstrap } from "./bindings/Bootstrap";
-import { ClaudeChecklist } from "./components/ClaudeChecklist";
 import { ErrorBox } from "./components/ErrorBox";
-import { JobsPanel } from "./components/JobsPanel";
-import { Painel } from "./components/Painel";
-import { StatusBar } from "./components/StatusBar";
+import { Icone } from "./components/Icone";
+import { IndicadorClaude } from "./components/IndicadorClaude";
 import { ipc, onClaudeStatus, toAppError } from "./ipc";
 import { Biblioteca } from "./screens/Biblioteca";
 import { Configuracoes } from "./screens/Configuracoes";
@@ -17,7 +15,7 @@ import { Setup } from "./screens/Setup";
 type Tela =
   | { nome: "biblioteca" }
   | { nome: "edital"; id: string; aviso?: string }
-  | { nome: "config" };
+  | { nome: "ajustes" };
 
 const VERIFICANDO: BackendStatus = {
   estado: "verificando",
@@ -36,7 +34,6 @@ export default function App() {
   const [erroBoot, setErroBoot] = useState<AppError | null>(null);
   const [claude, setClaude] = useState<BackendStatus>(VERIFICANDO);
   const [tela, setTela] = useState<Tela>({ nome: "biblioteca" });
-  const [painel, setPainel] = useState<"diagnostico" | "jobs" | null>(null);
   const [pulouSetup, setPulouSetup] = useState(false);
 
   useEffect(() => {
@@ -52,62 +49,63 @@ export default function App() {
   const verificar = useCallback(() => {
     ipc.claudeVerificar().then(setClaude, () => {});
   }, []);
-  const fecharPainel = useCallback(() => setPainel(null), []);
   const abrirEdital = useCallback((id: string, aviso?: string) => setTela({ nome: "edital", id, aviso }), []);
   const irBiblioteca = useCallback(() => setTela({ nome: "biblioteca" }), []);
+  const irAjustes = useCallback(() => setTela({ nome: "ajustes" }), []);
 
   if (erroBoot) return <main className="tela"><ErrorBox erro={erroBoot} contexto="Inicialização" /></main>;
   if (!boot) return null;
 
   const emSetup =
-    !boot.health_ja_passou && !pulouSetup && claude.estado === "indisponivel" && tela.nome !== "config";
+    !boot.health_ja_passou && !pulouSetup && claude.estado === "indisponivel" && tela.nome !== "ajustes";
 
   return (
     <div className="app">
-      <nav className="topo">
-        <span className="marca-app">Edital Killer</span>
-        <button className={tela.nome !== "config" ? "ativo" : ""} onClick={irBiblioteca}>
-          Biblioteca
+      <header className="masthead">
+        <button className="marca-app" onClick={irBiblioteca} aria-label="Ir para a biblioteca">
+          Edital <em>Killer</em>
         </button>
-        <button className={tela.nome === "config" ? "ativo" : ""} onClick={() => setTela({ nome: "config" })}>
-          Configurações
-        </button>
-      </nav>
+        <nav className="masthead-nav">
+          <button className={tela.nome !== "ajustes" ? "ativo" : ""} onClick={irBiblioteca}>
+            Editais
+          </button>
+        </nav>
+        <div className="masthead-dir">
+          <IndicadorClaude status={claude} onClick={irAjustes} />
+          <button
+            className={`icone-btn ${tela.nome === "ajustes" ? "ativo" : ""}`}
+            onClick={irAjustes}
+            aria-label="Ajustes"
+            title="Ajustes"
+          >
+            <Icone nome="ajustes" />
+          </button>
+        </div>
+      </header>
 
       <div className="conteudo">
         {emSetup ? (
-          <Setup
-            status={claude}
-            onVerificar={verificar}
-            onConfiguracoes={() => setTela({ nome: "config" })}
-            onPular={() => setPulouSetup(true)}
-          />
+          <Setup status={claude} onVerificar={verificar} onAjustes={irAjustes} onPular={() => setPulouSetup(true)} />
         ) : tela.nome === "biblioteca" ? (
           <Biblioteca onAbrir={abrirEdital} />
         ) : tela.nome === "edital" ? (
-          <EditalScreen key={tela.id} id={tela.id} aviso={tela.aviso} onVoltar={irBiblioteca} />
+          <EditalScreen
+            key={tela.id}
+            id={tela.id}
+            aviso={tela.aviso}
+            claude={claude}
+            onVoltar={irBiblioteca}
+            onAjustes={irAjustes}
+          />
         ) : (
-          <Configuracoes pastaDados={boot.pasta_dados} onVoltar={irBiblioteca} />
+          <Configuracoes
+            pastaDados={boot.pasta_dados}
+            versaoApp={boot.versao_app}
+            claude={claude}
+            onVerificar={verificar}
+          />
         )}
       </div>
-
-      <StatusBar status={claude} onDiagnostico={() => setPainel("diagnostico")} onJobs={() => setPainel("jobs")} />
-
-      {painel === "diagnostico" && (
-        <Painel titulo="Diagnóstico do Claude CLI" onFechar={fecharPainel}>
-          <ClaudeChecklist status={claude} />
-          {claude.origem_caminho && <p className="mudo">Caminho obtido por: {claude.origem_caminho}</p>}
-          {claude.verificado_em && (
-            <p className="mudo">Última verificação: {new Date(claude.verificado_em).toLocaleString("pt-BR")}</p>
-          )}
-          <div className="acoes">
-            <button className="primario" onClick={verificar} disabled={claude.estado === "verificando"}>
-              Verificar de novo
-            </button>
-          </div>
-        </Painel>
-      )}
-      {painel === "jobs" && <JobsPanel onFechar={fecharPainel} />}
     </div>
   );
 }

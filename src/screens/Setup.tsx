@@ -4,32 +4,36 @@ import { ClaudeChecklist } from "../components/ClaudeChecklist";
 export function Setup({
   status,
   onVerificar,
-  onConfiguracoes,
+  onAjustes,
   onPular,
 }: {
   status: BackendStatus;
   onVerificar: () => void;
-  onConfiguracoes: () => void;
+  onAjustes: () => void;
   onPular: () => void;
 }) {
   return (
     <main className="tela setup">
-      <h1>Bem-vindo ao Edital Killer</h1>
-      <p>
-        A parte de IA usa o <strong>Claude Code</strong> instalado e logado nesta máquina. O app nunca lê nem guarda
-        suas credenciais: ele só chama o <code>claude</code> que você já usa.
+      <p className="kicker">Primeiro uso</p>
+      <h1 className="titulo-display">
+        Do edital ao plano de estudos, <em>sem ler 80 páginas.</em>
+      </h1>
+      <p className="setup-lede">
+        O Edital Killer usa o <strong>Claude</strong> da sua própria conta para ler o edital e organizar o que cai na sua
+        prova. Para isso, o Claude Code precisa estar instalado e conectado neste computador. O app nunca vê nem guarda a
+        sua senha.
       </p>
       <ClaudeChecklist status={status} />
       <div className="acoes">
         <button className="primario" onClick={onVerificar} disabled={status.estado === "verificando"}>
           Verificar de novo
         </button>
-        <button onClick={onConfiguracoes}>Informar caminho do claude</button>
-        <button className="link" onClick={onPular}>
-          Continuar sem o Claude
-        </button>
+        <button onClick={onAjustes}>Já instalei, mas não foi encontrado</button>
       </div>
-      <p className="mudo">Sem o Claude você ainda pode importar e ler editais; só o processamento fica bloqueado.</p>
+      <button className="link" onClick={onPular}>
+        Continuar sem o Claude por enquanto →
+      </button>
+      <p className="mudo">Você ainda pode importar e ler editais; só a análise fica esperando.</p>
     </main>
   );
 }

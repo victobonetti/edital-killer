@@ -3,8 +3,8 @@ import { ErrorBox } from "./ErrorBox";
 
 type Item = { ok: boolean | null; rotulo: string; info?: string | null };
 
-/** Checklist do Claude CLI: instalado, versão, login. Usado no Setup e no diagnóstico. */
-export function ClaudeChecklist({ status }: { status: BackendStatus }) {
+/** Checklist do Claude CLI: instalado, versão, login. `detalhado` mostra caminho e versão (diagnóstico). */
+export function ClaudeChecklist({ status, detalhado = false }: { status: BackendStatus; detalhado?: boolean }) {
   const verificando = status.estado === "verificando";
   // Cada passo só é avaliado se o anterior passou; `null` = não avaliado.
   const instalado = status.caminho !== null;
@@ -13,10 +13,10 @@ export function ClaudeChecklist({ status }: { status: BackendStatus }) {
 
   const itens: Item[] = [
     { ok: instalado, rotulo: "Claude Code instalado", info: status.caminho },
-    { ok: executa, rotulo: "Executa e responde", info: status.versao && `versão ${status.versao}` },
+    { ok: executa, rotulo: "Funcionando", info: status.versao && `versão ${status.versao}` },
     {
       ok: logado,
-      rotulo: "Conta logada",
+      rotulo: "Conta conectada",
       info: status.metodo_login ?? (executa && status.logado === null ? "não foi possível confirmar" : null),
     },
   ];
@@ -30,7 +30,7 @@ export function ClaudeChecklist({ status }: { status: BackendStatus }) {
               {verificando ? "…" : it.ok === true ? "✓" : it.ok === false ? "✕" : "–"}
             </span>
             <span>{it.rotulo}</span>
-            {it.info && <span className="info">{it.info}</span>}
+            {detalhado && it.info && <span className="info">{it.info}</span>}
           </li>
         ))}
       </ul>
