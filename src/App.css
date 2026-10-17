@@ -13,6 +13,7 @@
   --carimbo: #c23f1b;
   --carimbo-suave: #f6e2d9;
   --carimbo-texto: #fff8f2;
+  --dado: #b4532f;
   --ok: #2d6a45;
   --ok-suave: #e1ecdf;
   --aviso: #94650a;
@@ -48,6 +49,7 @@
     --carimbo: #ee6c43;
     --carimbo-suave: #3a1f15;
     --carimbo-texto: #12110e;
+    --dado: #d26a40;
     --ok: #74c08e;
     --ok-suave: #1b2c20;
     --aviso: #e0ae4a;
@@ -345,6 +347,43 @@ input:focus { outline: none; border-color: var(--tinta-2); box-shadow: 0 0 0 3px
 .selo.analisando { color: var(--carimbo); animation: pulsar 1.6s infinite; }
 .sobre .acoes { margin-top: 0; }
 
+/* Seu cargo: uma linha só depois da escolha. */
+.seu-cargo { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: -12px 0 0; }
+.seu-cargo .kicker { margin: 0; color: var(--mudo); }
+.seu-cargo strong { font-family: var(--f-display); font-size: 19px; font-weight: 500; }
+
+/* Raio-X: barras de valor por matéria + insights. */
+.raio-x-corpo { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 36px; padding-top: 18px; }
+.valor-materias { margin: 0; }
+.valor-materias figcaption { font-size: 12.5px; margin-bottom: 10px; }
+.valor-materias ol { list-style: none; margin: 0; padding: 0; }
+.valor-materias li {
+  position: relative; display: grid; grid-template-columns: minmax(110px, 38%) 1fr 44px; align-items: center; gap: 12px;
+  padding: 5px 0; border-radius: 3px; outline: none;
+}
+.valor-materias li:hover, .valor-materias li:focus-visible { background: color-mix(in srgb, var(--folha-2) 70%, transparent); }
+.vm-nome { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-trilho { height: 16px; display: flex; align-items: center; }
+.vm-barra { display: block; height: 16px; min-width: 3px; background: var(--dado); border-radius: 0 4px 4px 0; }
+.vm-valor { font-family: var(--f-mono); font-size: 12px; text-align: right; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.asterisco { color: var(--aviso); margin-left: 1px; }
+.vm-dica {
+  position: absolute; z-index: 5; left: 38%; bottom: calc(100% + 6px); min-width: 240px; max-width: 320px;
+  padding: 10px 12px; background: var(--tinta); color: var(--papel); border-radius: 4px; font-size: 12.5px; line-height: 1.45;
+  box-shadow: var(--sombra); opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .12s, transform .12s;
+}
+.vm-dica strong { display: block; font-weight: 600; margin-bottom: 2px; }
+.valor-materias li:hover .vm-dica, .valor-materias li:focus .vm-dica { opacity: 1; transform: none; }
+.nota-rodape { font-size: 12px; margin-top: 10px; }
+
+.insights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.insights li { display: flex; flex-direction: column; gap: 3px; padding: 12px 0; border-bottom: 1px solid var(--fio); }
+.insights li:first-child { padding-top: 0; }
+.insights strong { font-family: var(--f-display); font-size: 18px; font-weight: 500; line-height: 1.2; }
+.insights span { color: var(--tinta-2); font-size: 13.5px; }
+.insights .conferir { align-self: flex-start; margin-top: 4px; }
+.leis { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+
 /* Números do edital. */
 .numeros { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border-top: 1px solid var(--fio-forte); border-bottom: 1px solid var(--fio); }
 .numeros > div { padding: 16px 20px 18px; border-left: 1px solid var(--fio); }
@@ -460,6 +499,7 @@ input:focus { outline: none; border-color: var(--tinta-2); box-shadow: 0 0 0 3px
 .setup > .mudo { font-size: 13px; }
 
 @media (max-width: 760px) {
+  .raio-x-corpo { grid-template-columns: 1fr; }
   .tela { padding: 24px 16px 48px; }
   .masthead { padding: 10px 16px; gap: 16px; }
   .indicador { display: none; }

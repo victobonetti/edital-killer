@@ -6,6 +6,7 @@ import type { Analise } from "../bindings/Analise";
 import type { BackendStatus } from "../bindings/BackendStatus";
 import type { Cargo } from "../bindings/Cargo";
 import type { Edital } from "../bindings/Edital";
+import type { EstruturaProva } from "../bindings/EstruturaProva";
 import type { EtapaAnalise } from "../bindings/EtapaAnalise";
 import type { Job } from "../bindings/Job";
 import type { Materia } from "../bindings/Materia";
@@ -99,15 +100,31 @@ const cargosDemo: Cargo[] = [
   { id: "c3", nome: "Agente da Fiscalização", vagas: 35, escolaridade: "Superior", pagina: 4, verificado: true },
 ];
 
+const estruturaDemo: EstruturaProva = {
+  duracao_minutos: 270,
+  duracao_verificada: true,
+  minimo_geral: 60,
+  minimo_verificado: true,
+  blocos: [
+    { nome: "Conhecimentos Gerais", questoes: 30, minimo: 50, verificado: true },
+    { nome: "Conhecimentos Específicos", questoes: null, minimo: 50, verificado: true },
+  ],
+};
+
 const analises: Record<string, Analise> = {
   "demo-completo": {
     andamento: null,
     cargos: cargosDemo,
     cargo_escolhido: "c1",
+    estrutura: estruturaDemo,
     materias: [
       {
         id: "m1",
         nome: "Língua Portuguesa",
+        bloco: "Conhecimentos Gerais",
+        questoes: null,
+        peso: 1,
+        quadro_verificado: true,
         pagina: 41,
         topicos: [
           t("Leitura e interpretação de textos", 41, [t("Sentido próprio e figurado", 41), t("Coesão e coerência", 41)]),
@@ -121,6 +138,10 @@ const analises: Record<string, Analise> = {
       {
         id: "m2",
         nome: "Governança e Gestão de TI",
+        bloco: "Conhecimentos Específicos",
+        questoes: 12,
+        peso: 2,
+        quadro_verificado: true,
         pagina: 44,
         topicos: [
           t("ITIL 4: práticas e cadeia de valor de serviço", 44),
@@ -132,6 +153,10 @@ const analises: Record<string, Analise> = {
       {
         id: "m3",
         nome: "Engenharia de Software",
+        bloco: "Conhecimentos Específicos",
+        questoes: 14,
+        peso: 2,
+        quadro_verificado: true,
         pagina: 45,
         topicos: [
           t("Princípios SOLID", 45),
@@ -143,18 +168,30 @@ const analises: Record<string, Analise> = {
       {
         id: "m4",
         nome: "Banco de Dados",
+        bloco: "Conhecimentos Específicos",
+        questoes: 8,
+        peso: 2,
+        quadro_verificado: true,
         pagina: 46,
         topicos: [t("Modelo relacional e normalização", 46), t("Transações e propriedades ACID", 47), t("SQL", 47)],
       },
       {
         id: "m5",
         nome: "Segurança da Informação",
+        bloco: "Conhecimentos Específicos",
+        questoes: 8,
+        peso: 2,
+        quadro_verificado: true,
         pagina: 47,
         topicos: [t("ISO/IEC 27001 e 27002", 47), t("LGPD", 47), t("Criptografia e certificação digital", 48)],
       },
       {
         id: "m6",
         nome: "Legislação",
+        bloco: "Conhecimentos Gerais",
+        questoes: null,
+        peso: 1,
+        quadro_verificado: false,
         pagina: 48,
         topicos: [
           t("Lei nº 14.133/2021 (licitações e contratos)", 48),
@@ -233,7 +270,7 @@ const materiasDemo: Materia[] = analises["demo-completo"].materias!;
 
 /** Simula o worker: o job fica "executando" por alguns segundos e então grava o resultado. */
 function simular(editalId: string, etapa: EtapaAnalise, aplicar: (a: Analise) => void) {
-  const a = (analises[editalId] ??= { cargos: [], cargo_escolhido: null, materias: null, andamento: null });
+  const a = (analises[editalId] ??= { cargos: [], cargo_escolhido: null, materias: null, estrutura: null, andamento: null });
   a.andamento = { etapa, status: "executando", desde: new Date().toISOString(), erro: null };
   void emit("claude-status", { ...pronto, estado: "ocupado" });
   const fim = setTimeout(() => {
@@ -286,13 +323,14 @@ export function instalarMockIpc() {
         case "jobs_listar":
           return jobs;
         case "edital_analise":
-          return analises[a.editalId as string] ?? { cargos: [], cargo_escolhido: null, materias: null, andamento: null };
+          return analises[a.editalId as string] ?? { cargos: [], cargo_escolhido: null, materias: null, estrutura: null, andamento: null };
         case "analise_iniciar": {
           const id = a.editalId as string;
           simular(id, "localizar", (an) => {
             an.cargos = cargosDemo;
             an.cargo_escolhido = null;
             an.materias = null;
+            an.estrutura = null;
             const e = editais.find((x) => x.id === id)!;
             if (!e.metadados_editados) {
               Object.assign(e, {
@@ -310,7 +348,10 @@ export function instalarMockIpc() {
           const id = a.editalId as string;
           analises[id].cargo_escolhido = a.cargoId as string;
           analises[id].materias = null;
-          simular(id, "extrair", (an) => (an.materias = materiasDemo));
+          simular(id, "extrair", (an) => {
+            an.materias = materiasDemo;
+            an.estrutura = estruturaDemo;
+          });
           return null;
         }
         case "analise_cancelar":

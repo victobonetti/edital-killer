@@ -13,6 +13,7 @@ import { ipc, onAnalise, toAppError } from "../ipc";
 import { CATALOGO } from "../ipc/errors";
 import { consolidar, contarTopicos, type Consolidado, type Etapa } from "../model/consolidado";
 import { dataCurta, dataLonga, duracao, faixas, plural } from "../model/formato";
+import { raioX, type RaioX } from "../model/raioX";
 
 type Aba = "visao" | "documento";
 
@@ -91,6 +92,7 @@ export function EditalScreen({
   }
 
   const visao = consolidar(edital, analise);
+  const rx = visao.materias ? raioX(visao.materias, analise?.estrutura ?? null) : null;
   const escolhendo = visao.etapa === "escolher_cargo" || (trocandoCargo && !!visao.cargos && !visao.rodando);
 
   return (
@@ -146,11 +148,20 @@ export function EditalScreen({
               onCancelar={() => acao(() => ipc.analiseCancelar(edital.id))}
             />
           )}
-          <Numeros edital={edital} visao={visao} />
-
-          {visao.cargos && !escolhendo && (
-            <Cargos visao={visao} onTrocar={visao.rodando ? undefined : () => setTrocandoCargo(true)} />
+          {visao.cargo && !escolhendo && (
+            <p className="seu-cargo">
+              <span className="kicker">Seu cargo</span>
+              <strong>{visao.cargo.nome}</strong>
+              {visao.cargos!.length > 1 && !visao.rodando && (
+                <button className="link" onClick={() => setTrocandoCargo(true)}>
+                  Trocar
+                </button>
+              )}
+            </p>
           )}
+          <Numeros edital={edital} visao={visao} rx={rx} />
+
+          {rx && <RaioXProva rx={rx} />}
 
           <section className="bloco">
             <header className="bloco-cabeca">
@@ -171,7 +182,7 @@ export function EditalScreen({
                     </span>
                   </p>
                 )}
-                <ConteudoProgramatico materias={visao.materias} onPagina={irParaPagina} />
+                <ConteudoProgramatico materias={visao.materias} rx={rx} onPagina={irParaPagina} />
               </>
             ) : (
               <ConteudoVazio etapa={visao.etapa} />
@@ -446,12 +457,13 @@ function detalheCargo(c: Cargo): string {
     .join(" · ");
 }
 
-function Numeros({ edital, visao }: { edital: Edital; visao: Consolidado }) {
+function Numeros({ edital, visao, rx }: { edital: Edital; visao: Consolidado; rx: RaioX | null }) {
+  const dias = edital.data_prova ? diasAte(edital.data_prova) : null;
   const itens: { valor: number | null; rotulo: string }[] = [
-    { valor: edital.total_paginas, rotulo: "páginas" },
-    { valor: visao.cargos?.length ?? null, rotulo: "cargos" },
+    rx ? { valor: Math.round(rx.totalQuestoes), rotulo: "questões" } : { valor: edital.total_paginas, rotulo: "páginas" },
     { valor: visao.materias?.length ?? null, rotulo: "matérias" },
     { valor: visao.totalTopicos, rotulo: "tópicos" },
+    { valor: dias !== null && dias >= 0 ? dias : null, rotulo: dias === 1 ? "dia até a prova" : "dias até a prova" },
   ];
   return (
     <dl className="numeros">
@@ -465,33 +477,149 @@ function Numeros({ edital, visao }: { edital: Edital; visao: Consolidado }) {
   );
 }
 
-function Cargos({ visao, onTrocar }: { visao: Consolidado; onTrocar?: () => void }) {
+function diasAte(ymd: string): number {
+  const [a, m, d] = ymd.split("-").map(Number);
+  const hoje = new Date();
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  return Math.round((new Date(a, m - 1, d).getTime() - inicio.getTime()) / 86_400_000);
+}
+
+const pct = (f: number) => `${Math.round(f * 100)}%`;
+const num = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+
+/** Onde está a nota: valor de cada matéria, concentração, densidade, ritmo e mínimos. */
+function RaioXProva({ rx }: { rx: RaioX }) {
+  const comPontos = rx.materias.filter((m) => m.fracao !== null);
+  const maior = Math.max(...comPontos.map((m) => m.fracao!));
+  const densas = comPontos.filter((m) => m.porTopico !== null).sort((a, b) => b.porTopico! - a.porTopico!);
+  const [maisDensa, menosDensa] = [densas[0], densas[densas.length - 1]];
+  const algumConferir = comPontos.some((m) => m.conferir || m.estimado);
+
+  const insights: { titulo: string; texto: string; conferir?: boolean }[] = [
+    {
+      titulo: `${rx.pareto50 === 1 ? "1 matéria" : `${rx.pareto50} matérias`} = metade da nota`,
+      texto: `E ${rx.pareto80} de ${comPontos.length} somam 80%. Comece por elas.`,
+    },
+  ];
+  if (maisDensa && menosDensa && maisDensa !== menosDensa && menosDensa.porTopico! > 0) {
+    const vezes = maisDensa.porTopico! / menosDensa.porTopico!;
+    insights.push({
+      titulo: `Tópico de ${maisDensa.nome} vale ${num(maisDensa.porTopico!)} pt`,
+      texto:
+        vezes >= 1.5
+          ? `${num(vezes)}× um tópico de ${menosDensa.nome}. Cada hora ali rende mais nota.`
+          : "A nota está bem distribuída entre os tópicos das matérias.",
+    });
+  }
+  if (rx.ritmo) {
+    insights.push({
+      titulo: `${duracao(rx.ritmo)} por questão`,
+      texto: "É o seu ritmo de prova, sem contar o tempo de passar o gabarito.",
+      conferir: rx.ritmoConferir,
+    });
+  }
+  for (const b of rx.blocos) {
+    insights.push({
+      titulo: `${b.nome}: mínimo de ${num(b.pontosMinimos)} pt`,
+      texto: `${b.minimo}% dos ${num(b.pontos)} pontos do bloco. Abaixo disso, eliminado.`,
+      conferir: b.conferir,
+    });
+  }
+  if (rx.minimoGeral) {
+    insights.push({
+      titulo: `Mínimo geral: ${num(rx.minimoGeral.pontosMinimos)} de ${num(rx.totalPontos)} pt`,
+      texto: `${rx.minimoGeral.minimo}% do total da prova objetiva.`,
+      conferir: rx.minimoGeral.conferir,
+    });
+  }
+
   return (
-    <section className="bloco">
+    <section className="bloco raio-x">
       <header className="bloco-cabeca">
         <h2 className="secao">
-          <span className="secao-num">§</span> Cargos do edital
+          <span className="secao-num">§</span> Raio-X da prova
         </h2>
-        {onTrocar && visao.cargo && (
-          <button className="link" onClick={onTrocar}>
-            Trocar de cargo
-          </button>
-        )}
+        <p className="mudo">
+          {num(rx.totalQuestoes)} questões · {num(rx.totalPontos)} pontos
+        </p>
       </header>
-      <ul className="cargos">
-        {visao.cargos!.map((c) => (
-          <li key={c.id} className={c.id === visao.cargo?.id ? "escolhido" : ""}>
-            <span className="cargo-nome">{c.nome}</span>
-            <span className="mudo">{detalheCargo(c)}</span>
-            {c.id === visao.cargo?.id ? <span className="selo pronto">Seu cargo</span> : <span />}
-          </li>
-        ))}
-      </ul>
+
+      <div className="raio-x-corpo">
+        <figure className="valor-materias">
+          <figcaption className="mudo">Quanto cada matéria vale da nota</figcaption>
+          <ol>
+            {rx.materias.map((m) => (
+              <li key={m.id} tabIndex={0}>
+                <span className="vm-nome">{m.nome}</span>
+                <span className="vm-trilho">
+                  {m.fracao !== null && <span className="vm-barra" style={{ width: `${(m.fracao / maior) * 100}%` }} />}
+                </span>
+                <span className="vm-valor">
+                  {m.fracao !== null ? pct(m.fracao) : "—"}
+                  {(m.conferir || m.estimado) && m.fracao !== null && <span className="asterisco">*</span>}
+                </span>
+                <span className="vm-dica" role="tooltip">
+                  <strong>{m.nome}</strong>
+                  {m.questoes !== null ? (
+                    <>
+                      {num(m.questoes)} questões{m.estimado && " (estimado)"} × peso {num(m.peso)} = {num(m.pontos!)} pt
+                      <br />
+                      {pct(m.fracao!)} da nota · {plural(m.topicos, "tópico", "tópicos")}
+                      {m.porTopico !== null && ` · ${num(m.porTopico)} pt por tópico`}
+                      {m.bloco && (
+                        <>
+                          <br />
+                          {m.bloco}
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    "O edital não informa as questões desta matéria."
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {algumConferir && (
+            <p className="mudo nota-rodape">
+              * Questões estimadas a partir do total do bloco, ou quadro não confirmado no texto do edital.
+            </p>
+          )}
+        </figure>
+
+        <ul className="insights">
+          {insights.map((i) => (
+            <li key={i.titulo}>
+              <strong>{i.titulo}</strong>
+              <span>{i.texto}</span>
+              {i.conferir && <span className="conferir">conferir no edital</span>}
+            </li>
+          ))}
+          {rx.leis.length > 0 && (
+            <li>
+              <strong>{plural(rx.leis.length, "lei citada", "leis citadas")} no conteúdo</strong>
+              <span className="leis">
+                {rx.leis.map((l) => (
+                  <code key={l}>{l}</code>
+                ))}
+              </span>
+            </li>
+          )}
+        </ul>
+      </div>
     </section>
   );
 }
 
-function ConteudoProgramatico({ materias, onPagina }: { materias: Materia[]; onPagina: (n: number) => void }) {
+function ConteudoProgramatico({
+  materias,
+  rx,
+  onPagina,
+}: {
+  materias: Materia[];
+  rx: RaioX | null;
+  onPagina: (n: number) => void;
+}) {
   const [abertas, setAbertas] = useState<Set<string>>(() => new Set(materias.slice(0, 1).map((m) => m.id)));
   const alternar = (id: string) =>
     setAbertas((s) => {
@@ -505,12 +633,16 @@ function ConteudoProgramatico({ materias, onPagina }: { materias: Materia[]; onP
     <ol className="materias">
       {materias.map((m, i) => {
         const aberta = abertas.has(m.id);
+        const v = rx?.materias.find((x) => x.id === m.id);
         return (
           <li key={m.id} className={aberta ? "aberta" : ""}>
             <button className="materia-cabeca" onClick={() => alternar(m.id)} aria-expanded={aberta}>
               <span className="materia-num">{String(i + 1).padStart(2, "0")}</span>
               <span className="materia-nome">{m.nome}</span>
-              <span className="mudo">{plural(contarTopicos(m.topicos), "tópico", "tópicos")}</span>
+              <span className="mudo">
+                {plural(contarTopicos(m.topicos), "tópico", "tópicos")}
+                {v?.fracao != null && ` · ${pct(v.fracao)} da nota`}
+              </span>
               <Icone nome="chevron" className="materia-seta" />
             </button>
             {aberta && <Topicos topicos={m.topicos} onPagina={onPagina} />}
