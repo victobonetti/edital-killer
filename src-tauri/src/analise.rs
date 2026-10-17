@@ -316,6 +316,40 @@ mod tests {
         assert!(and.erro.is_none());
     }
 
+    /// Usa o `claude` instalado e logado (gasta uso da conta). Rodar com:
+    /// `cargo test ponta_a_ponta -- --ignored --nocapture`
+    #[tokio::test]
+    #[ignore]
+    async fn ponta_a_ponta_com_claude_real() {
+        let (db, paths, _d) = ambiente();
+        let backend = ClaudeCliBackend { caminho_manual: None };
+        let settings = Settings::default();
+
+        let p = pedido(&db, EtapaAnalise::Localizar);
+        executar(&db, &paths, &backend, &p, &settings, CancelToken::default())
+            .await
+            .unwrap_or_else(|f| panic!("localizador: {:?}", f.erro));
+        let a = carregar(&db, "e1").unwrap();
+        let e = edital_repo::get(&db.conn().unwrap(), "e1").unwrap();
+        println!("edital: {} | {:?} | prova {:?}", e.nome, e.orgao, e.data_prova);
+        println!("cargos: {:#?}", a.cargos);
+        assert!(!a.cargos.is_empty());
+
+        analise_repo::escolher_cargo(&db.conn().unwrap(), "e1", &a.cargos[0].id).unwrap();
+        let p = pedido(&db, EtapaAnalise::Extrair);
+        executar(&db, &paths, &backend, &p, &settings, CancelToken::default())
+            .await
+            .unwrap_or_else(|f| panic!("extrator: {:?}", f.erro));
+        let materias = carregar(&db, "e1").unwrap().materias.unwrap();
+        for m in &materias {
+            println!("{} (p. {:?})", m.nome, m.pagina);
+            for t in &m.topicos {
+                println!("  {} {} p.{:?}", if t.verificado { "✓" } else { "?" }, t.texto, t.pagina);
+            }
+        }
+        assert!(!materias.is_empty());
+    }
+
     #[tokio::test]
     async fn saida_invalida_nao_apaga_resultado_anterior() {
         let (db, paths, _d) = ambiente();
