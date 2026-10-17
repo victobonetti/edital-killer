@@ -3,10 +3,13 @@
 
 pub mod discovery;
 pub mod health;
+mod processo;
+pub mod runner;
 
 use async_trait::async_trait;
 
-use super::backend::{BackendEstado, BackendStatus, LlmBackend};
+use super::backend::{BackendEstado, BackendStatus, Execucao, FalhaJob, LlmBackend};
+use super::cancel::CancelToken;
 use crate::error::{AppError, ErrorCode};
 
 pub struct ClaudeCliBackend {
@@ -57,5 +60,11 @@ impl LlmBackend for ClaudeCliBackend {
 
         st.estado = BackendEstado::Pronto;
         st
+    }
+
+    async fn executar(&self, ex: Execucao, cancel: CancelToken) -> Result<serde_json::Value, FalhaJob> {
+        let encontrado = discovery::descobrir(self.caminho_manual.as_deref())
+            .map_err(|erro| FalhaJob { erro, retorno_em: None })?;
+        runner::executar(&encontrado.caminho, ex, cancel).await
     }
 }

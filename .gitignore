@@ -25,3 +25,6 @@ dist-ssr
 
 # Rust
 src-tauri/target
+
+# fake-claude
+tools/fake-claude/target

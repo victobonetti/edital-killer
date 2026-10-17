@@ -6,7 +6,6 @@ use std::process::{Output, Stdio};
 use std::time::Duration;
 
 use serde::Deserialize;
-use tokio::process::Command;
 
 use crate::error::{AppError, AppResult, ErrorCode};
 
@@ -48,17 +47,8 @@ pub async fn login(claude: &Path) -> AppResult<Option<Login>> {
 }
 
 async fn executar(claude: &Path, args: &[&str], timeout: Duration) -> AppResult<Output> {
-    let mut cmd = Command::new(claude);
-    cmd.args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    #[cfg(windows)]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
+    let mut cmd = super::processo::comando(claude);
+    cmd.args(args).stdin(Stdio::null());
     let child = cmd.spawn().map_err(|e| {
         AppError::new(
             ErrorCode::ClaudeNotRunnable,

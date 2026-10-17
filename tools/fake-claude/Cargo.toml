@@ -1,0 +1,8 @@
+[package]
+name = "fake-claude"
+version = "0.1.0"
+edition = "2021"
+description = "Imita o `claude -p --output-format json` nos testes do core."
+publish = false
+
+[dependencies]

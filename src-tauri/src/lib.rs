@@ -5,6 +5,8 @@ mod importacao;
 mod llm;
 mod state;
 mod storage;
+#[cfg(test)]
+mod test_support;
 
 use tauri::Manager;
 use tracing_subscriber::EnvFilter;

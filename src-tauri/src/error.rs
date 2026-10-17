@@ -34,6 +34,20 @@ pub enum ErrorCode {
     ClaudeNotLoggedIn,
     /// `claude` não respondeu dentro do tempo limite.
     ClaudeTimeout,
+    /// `claude` executou, mas terminou com erro (API, rede, processo).
+    ClaudeExecFailed,
+    /// Conta em limite de uso; o status do backend traz `retorno_em` quando conhecido.
+    ClaudeUsageLimit,
+    /// O modelo configurado não está disponível para a conta (ex.: exige créditos).
+    ClaudeModelUnavailable,
+    /// Saída do `claude` não é JSON válido ou não segue o schema.
+    ClaudeOutputInvalid,
+    /// Job cancelado pelo usuário.
+    JobCancelled,
+    /// Já existe uma análise na fila ou executando para este edital.
+    AnaliseEmAndamento,
+    /// O localizador não encontrou nenhum cargo verificável no edital.
+    CargosNaoEncontrados,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, thiserror::Error)]
